@@ -1,6 +1,6 @@
 # Dr Non's OpenClaw Set-Up
 
-<p align="center"><img src="diagrams/banner.png" alt="Dr Non's OpenClaw Set-Up — your local AI super-assistant, always ready to claw" /></p>
+<p align="center"><img src="diagrams/banner.png" alt="Dr Non's Original OpenClaw Setup — built by one human, open for everyone" /></p>
 
 > **A field guide to running a multi-channel AI gateway on your own machine.**
 > What it is, what it can reach, what it can *do to you* if you set it up
@@ -10,6 +10,35 @@ This is a **learner's guide**, not a fork. [OpenClaw](https://www.npmjs.com/pack
 is someone else's excellent software; this repo is the map I wish I'd had before
 running `npm install -g openclaw` — written after a summer of actually operating
 it unattended.
+
+---
+
+## 🤖 Don't have a clue where to start? Let an agent do it.
+
+**Paste this to Claude Code (or any capable coding agent):**
+
+```
+Set up OpenClaw on my machine following
+https://github.com/Nonarkara/dr-non-openclaw-setup
+```
+
+It will clone the repo, find [`AGENTS.md`](AGENTS.md), and work through the
+setup — surveying your machine first, installing, locking down security
+*before* connecting anything, choosing local models that fit your RAM, and
+reporting back what you've got.
+
+**What the agent will not do**, by instruction:
+
+- ❌ Type any credential — it hands the keyboard to you for every key
+- ❌ Set the permissive `yolo` exec policy, even to fix an error
+- ❌ Expose the gateway beyond `127.0.0.1`
+- ❌ Weaken any security control to make a step succeed
+- ❌ Install extra tools, models, or MCP servers without asking
+
+It stops and asks at every 🛑 in `AGENTS.md` — those are your decisions, not
+its. You stay in control of the parts that matter; it does the tedious parts.
+
+*Prefer to drive yourself? Everything the agent does is in the docs below.*
 
 ---
 
@@ -134,10 +163,13 @@ is the right first move whenever something misbehaves.
 
 | Doc | What's in it |
 |---|---|
+| **[`AGENTS.md`](AGENTS.md)** | **The machine-followable setup procedure.** Hand this repo to an agent and it executes this — with hard rules it must not break and 🛑 stops where you decide |
 | [`docs/01-what-you-are-installing.md`](docs/01-what-you-are-installing.md) | An honest inventory of the capabilities and trust decisions you're accepting — read before `npm install` |
 | [`docs/02-architecture.md`](docs/02-architecture.md) | How a message becomes an action: request flow, agents, sessions, skills, MCP |
 | [`docs/03-security.md`](docs/03-security.md) | Threat model, exec policy, sandboxing, secrets, channel exposure, hardening checklist |
 | [`docs/04-operating-it.md`](docs/04-operating-it.md) | Keeping it alive: health checks that don't lie, restart logic that works, alert fatigue, and the failure modes that cost me a summer |
+| [`docs/05-local-llm-16gb.md`](docs/05-local-llm-16gb.md) | **Local models on 16GB** — which model for which job, the memory budget nobody mentions, and the three settings (`think`, `num_ctx`, `keep_alive`) that decide whether local inference works at all |
+| [`docs/06-essential-tool-calls.md`](docs/06-essential-tool-calls.md) | **Which capabilities to enable, in what order**, tiered by risk — plus the allowlist rule that quietly undoes a "cautious" setup |
 
 ---
 
