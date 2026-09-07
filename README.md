@@ -1,201 +1,198 @@
+<p align="center">
+  <img src="docs/hero-banner.png" alt="Hand-drawn manga of a Bangkok civic-studio workshop: one Mac on a wooden desk, a glass-domed gateway machine, an open padlock, a mentor and a learner, red lobster helpers. No HUD." width="100%">
+</p>
+<p align="center"><em>One desk, one machine, a gateway that asks before it acts — the method is public; the keys stay in your pocket.</em></p>
+
 # Dr Non's OpenClaw Set-Up
 
-<p align="center"><img src="diagrams/banner.png" alt="Dr Non's Original OpenClaw Setup — built by one human, open for everyone" /></p>
+**A learner's field guide to running a multi-channel AI gateway on your own machine — useful, and safe by default.**
 
-> **A field guide to running a multi-channel AI gateway on your own machine.**
-> What it is, what it can reach, what it can *do to you* if you set it up
-> carelessly — and how to set it up so that it can't.
+[![License: MIT](https://img.shields.io/badge/license-MIT-1A1A1A)](LICENSE)
+[![Docs only](https://img.shields.io/badge/tree-docs%20only-1A1A1A)](docs/)
+[![OpenClaw](https://img.shields.io/badge/upstream-openclaw-1A1A1A)](https://www.npmjs.com/package/openclaw)
 
-This is a **learner's guide**, not a fork. [OpenClaw](https://www.npmjs.com/package/openclaw)
-is someone else's excellent software; this repo is the map I wish I'd had before
-running `npm install -g openclaw` — written after a summer of actually operating
-it unattended.
+By [Non Arkaraprasertkul](https://github.com/Nonarkara) (Nonarkara) — architect, urban anthropologist, and founder of **[Axiom X Co., Ltd.](https://axiom.nonarkara.org)**, a one-desk civic studio in Bangkok.
+
+This repository is independent studio writing. It is **not** an official depa, ASEAN, or municipal product. [OpenClaw](https://www.npmjs.com/package/openclaw) is upstream software; this repo is the map, not a fork of the product. There is no hosted gateway URL here — you run it on **your** machine.
+
+**ไทย / English.** The studio audience is bilingual. This README and the docs are English-first so a fork anywhere can follow the CLI; keep Thai in the work you do with the agent.
 
 ---
 
-## 🤖 Don't have a clue where to start? Let an agent do it.
+## What this is
 
-**Paste this to Claude Code (or any capable coding agent):**
+OpenClaw installs a **persistent background service** that sits between your chat apps, a set of AI models, and — if you allow it — a shell on your computer. This repo is the guide I wish I had before `npm install -g openclaw`: what it is, what it can reach, what it can do *to you* if you set it up carelessly, and how to set it up so that it can't.
+
+It is a **learner's guide**, not a product. Bugs and features belong [upstream](https://www.npmjs.com/package/openclaw). What you get here is documentation, diagrams, and a machine-followable setup procedure.
+
+What is in **this** public tree:
+
+| Path | What you actually get |
+|---|---|
+| [`AGENTS.md`](AGENTS.md) | The setup an agent executes — survey, install, lock down, local models, one channel, sandbox, audit — with hard rules and 🛑 stops that are yours |
+| [`CLAUDE.md`](CLAUDE.md) | A short pointer: follow `AGENTS.md`; never type a credential; `cautious` is the floor |
+| [`docs/01-what-you-are-installing.md`](docs/01-what-you-are-installing.md) | An inventory of the capabilities you are granting, before you install |
+| [`docs/02-architecture.md`](docs/02-architecture.md) | How a message becomes an action, and every gate on that path |
+| [`docs/03-security.md`](docs/03-security.md) | Threat model, exec policy, sandbox, secrets, channel exposure, hardening checklist |
+| [`docs/04-operating-it.md`](docs/04-operating-it.md) | Keeping it alive unattended: health checks that don't lie, restarts that restart, quiet failure modes |
+| [`docs/05-local-llm-16gb.md`](docs/05-local-llm-16gb.md) | Local models on a 16GB machine — which job for which model, and why the RAM number lies |
+| [`docs/06-essential-tool-calls.md`](docs/06-essential-tool-calls.md) | Which tools to enable, in what order, tiered by risk |
+| [`docs/hero-banner.png`](docs/hero-banner.png) | The illustration at the top of this page |
+
+**This repo is not:**
+
+- A copy of OpenClaw, or a place to file upstream bugs.
+- A live hosted gateway, bot, or demo URL. Nothing here is running for you.
+- Credentials, private config, personal paths, or a dump of tokens. Every key, ID, and path in these docs is a placeholder.
+- A ranking, a dashboard, or a government system.
+
+Related public work: [agentic AI council](https://github.com/Nonarkara/dr-non-agentic-ai-council) (OpenClaw as one engine among several), [offline AI coding](https://github.com/Nonarkara/offline-ai-coding), [live-coding bible](https://github.com/Nonarkara/live-coding-bible).
+
+---
+
+## Philosophy
+
+Four studio tenets. They are how this repo is meant to be forked, not slogans.
+
+**Fork the method, not the secrets.** The method is the order of operations in `AGENTS.md`, the threat model in `docs/03-security.md`, the model picks in `docs/05-local-llm-16gb.md`, and the rule that policy is set *before* any channel can reach the machine. Provider keys, bot tokens, pairing codes, and your config directory are not in this tree. If a learner needs your secrets to follow the guide, the guide failed.
+
+**One Mac.** The notes in `docs/05-local-llm-16gb.md` were taken on a 16GB Apple M3. The gateway is one long-lived process on one desk — not a cluster, not a public tunnel. Remote access is device pairing, not an open port. Bind `127.0.0.1`.
+
+**No black-box rankings.** Exec policy is a named preset you can print (`cautious`, `deny-all`, or — never as a default — `yolo`). Sandbox *effective* policy is what `openclaw sandbox explain` says, not what you intended. A health check that returns success while doing nothing useful is a lie; verify the effect, not the exit code. Nothing here scores cities, people, or models behind a closed formula.
+
+**ไทย / English as the audience.** Civic-studio work on this account is bilingual. Agents should be able to write both. This README stays English-first so an international fork can run the CLI without guessing. Do not invent a Thai translation of a command that is only documented in English, or the reverse.
+
+Company: **Axiom X Co., Ltd.** Author: **Non Arkaraprasertkul** ([Nonarkara](https://github.com/Nonarkara)).
+
+---
+
+## Ethical use
+
+This guide is for **a gateway you own**, used as public-good civic infrastructure or as a personal assistant you can defend. It is not a kit for exposing a control plane, for running unattended shell on a stranger's message, or for pretending a private bot is an official channel.
+
+**Do**
+
+- Set exec policy to `cautious` or `deny-all` **before** connecting a channel. `cautious` asks before a command runs. `deny-all` is a conversational assistant. Both are honest.
+- Bind the gateway to loopback. Reach a phone with `openclaw devices` / pairing, not a public port and not a bare tunnel.
+- Require approval for inbound DMs (`openclaw pairing`). Anyone who can message the bot can put text in front of the agent.
+- Keep provider keys and bot tokens out of git. Use SecretRefs or the operator's environment. Scan before you push.
+- Run agents that read untrusted content (web, email, stranger DMs) inside a Docker sandbox when Docker is available. If it isn't, say so — do not pretend the host filesystem is contained.
+- Add one channel, one agent, and live with that before adding MCP servers or a second surface.
+
+**Do not**
+
+- Set `exec-policy preset yolo` to "fix" a refused command. A refusal is a finding.
+- Bind the gateway beyond `127.0.0.1`, open a public tunnel, or disable a control so a step succeeds.
+- Commit API keys, bot tokens, pairing codes, session logs, or a real config directory.
+- Imply depa, ASEAN, a municipality, or Axiom X operates the learner's gateway. This repo is a map. The install is theirs.
+- Treat these docs as authorization to copy someone else's private OpenClaw workspace.
+
+If a contribution would only work by pasting a secret, it does not belong here.
+
+The single most important page in this repo is [`docs/03-security.md`](docs/03-security.md). If you read one thing, read that.
+
+---
+
+## How to use / learn
+
+Two readers, one tree.
+
+### Let an agent do the tedious parts
+
+Paste this to Claude Code, Cursor, or any capable coding agent:
 
 ```
 Set up OpenClaw on my machine following
 https://github.com/Nonarkara/dr-non-openclaw-setup
 ```
 
-It will clone the repo, find [`AGENTS.md`](AGENTS.md), and work through the
-setup — surveying your machine first, installing, locking down security
-*before* connecting anything, choosing local models that fit your RAM, and
-reporting back what you've got.
+It will find [`AGENTS.md`](AGENTS.md) and work through the procedure: survey the machine, install, lock down **before** anything inbound, pick local models that fit your RAM, connect one channel only when you say so, then report what you have.
 
-**What the agent will not do**, by instruction:
+What the agent is instructed **not** to do:
 
-- ❌ Type any credential — it hands the keyboard to you for every key
-- ❌ Set the permissive `yolo` exec policy, even to fix an error
-- ❌ Expose the gateway beyond `127.0.0.1`
-- ❌ Weaken any security control to make a step succeed
-- ❌ Install extra tools, models, or MCP servers without asking
+- Type any credential — it hands the keyboard to you
+- Set the permissive `yolo` exec policy, even to fix an error
+- Expose the gateway beyond `127.0.0.1`
+- Weaken a security control to make a step succeed
+- Install extra tools, models, or MCP servers without asking
 
-It stops and asks at every 🛑 in `AGENTS.md` — those are your decisions, not
-its. You stay in control of the parts that matter; it does the tedious parts.
+It stops at every 🛑 in `AGENTS.md`. Those are your decisions.
 
-*Prefer to drive yourself? Everything the agent does is in the docs below.*
+### Or drive it yourself
 
----
-
-## Read this before you install anything
-
-You are about to install a program that, by design:
-
-- runs a **persistent background service** on your machine
-- **reads and sends messages** on your behalf on chat platforms
-- can **execute shell commands** on your computer
-- holds **API keys** for model providers
-- can be reached from **your phone**
-
-That's not a warning against using it — that combination is precisely what
-makes it useful. But "AI assistant" undersells it. It is closer to **a service
-account with a shell on your laptop that answers to a chat app.** Configure it
-like one.
-
-The single most important page in this repo is
-**[`docs/03-security.md`](docs/03-security.md)**. If you read one thing, read
-that. It covers the three-line hardening that puts you in a defensible position:
-
-```bash
-openclaw exec-policy preset cautious   # ask before running commands
-openclaw security audit                # find the foot-guns you already have
-openclaw sandbox explain               # see the policy that is ACTUALLY in effect
-```
-
----
-
-## What it actually is
-
-**OpenClaw is a gateway.** One long-lived process that sits between your chat
-channels, a set of AI models, and your machine's capabilities.
-
-```mermaid
-flowchart TB
-    subgraph Channels["📱 Channels — where you talk to it"]
-        TG[Telegram]:::ch
-        DC[Discord]:::ch
-        OT[Other messaging<br/>integrations]:::ch
-    end
-
-    subgraph Core["⚙️ OpenClaw Gateway — one long-lived service"]
-        RT[Router<br/>which agent handles this?]:::core
-        AG[Agents<br/>isolated workspaces + auth]:::core
-        SESS[Sessions + Memory<br/>conversation state]:::core
-        POL[Policy layer<br/>exec approvals · allowlists]:::sec
-    end
-
-    subgraph Capabilities["🛠️ What it can reach"]
-        MODELS[Model providers<br/>cloud + local]:::cap
-        SKILLS[Skills<br/>packaged capabilities]:::cap
-        MCP[MCP servers<br/>external tools]:::cap
-        SHELL[Shell / filesystem<br/>GATED BY POLICY]:::danger
-    end
-
-    TG --> RT
-    DC --> RT
-    OT --> RT
-    RT --> AG
-    AG <--> SESS
-    AG --> POL
-    POL --> MODELS
-    POL --> SKILLS
-    POL --> MCP
-    POL -.->|only what you allow| SHELL
-
-    classDef ch fill:#1e3a5f,stroke:#4a9eff,color:#fff
-    classDef core fill:#2d1f3d,stroke:#a855f7,color:#fff
-    classDef sec fill:#3d2f1f,stroke:#f59e0b,color:#fff
-    classDef cap fill:#1f3d2f,stroke:#10b981,color:#fff
-    classDef danger fill:#3d1f1f,stroke:#ef4444,color:#fff
-```
-
-Everything routes through the **policy layer**. That box is the whole security
-story: get it right and the rest is upside.
-
----
-
-## The five-minute mental model
-
-| Concept | What it means | Why you care |
-|---|---|---|
-| **Gateway** | The always-on service. Everything flows through it. | If it's down, nothing works. If it's exposed, everything is exposed. |
-| **Channels** | Telegram, Discord, etc. | Each is an inbound path to your machine. Add deliberately. |
-| **Agents** | Isolated workspaces with their own auth + routing | Isolation boundary. One agent per trust level. |
-| **Skills** | Packaged capabilities the agent can invoke | Where most real usefulness lives |
-| **MCP servers** | External tool providers | Extend reach — and attack surface |
-| **Exec policy** | Whether the agent may run shell commands | **The most consequential setting in the product** |
-| **Sandbox** | Docker-based isolation for agent execution | The difference between "risky" and "contained" |
-
----
-
-## Install
-
-**Prerequisites:** Node.js 20+, and Docker if you want sandboxing (you do).
+**Need:** Node.js 20+, roughly 10GB free disk. Docker is strongly recommended (sandboxing). Ollama is optional (local models).
 
 ```bash
 npm install -g openclaw
-openclaw onboard          # guided setup: gateway, workspace, auth, channels
+openclaw --version
+
+# Policy first — before onboard, before any channel
+openclaw exec-policy preset cautious
+openclaw exec-policy preset          # must print cautious or deny-all
+
+openclaw onboard                     # you type every secret
 ```
 
-Then, before connecting anything to the outside world:
+Then, still before the outside world can reach it:
 
 ```bash
-openclaw exec-policy preset cautious
 openclaw security audit
 openclaw status
+openclaw sandbox explain             # effective policy, not intent
 ```
 
-`openclaw doctor` diagnoses and repairs most config/gateway/channel problems and
-is the right first move whenever something misbehaves.
+Local models, if you have Ollama and the RAM (see [`docs/05-local-llm-16gb.md`](docs/05-local-llm-16gb.md) before pulling a 12B):
 
-> **Do not start with `yolo`.** The exec-policy presets are `yolo`, `cautious`,
-> and `deny-all`. Start at `cautious`, or `deny-all` if you only want a
-> conversational assistant. Move up deliberately, never as a debugging step.
+```bash
+ollama pull nomic-embed-text         # embeddings
+ollama pull qwen3:4b                 # fast text
+ollama pull gemma3:4b                # vision
+openclaw models scan
+openclaw models list
+```
 
----
+One channel, then pairing:
 
-## The docs
+```bash
+openclaw channels
+openclaw pairing                     # inbound DM approval
+openclaw devices                     # paired devices
+```
 
-| Doc | What's in it |
-|---|---|
-| **[`AGENTS.md`](AGENTS.md)** | **The machine-followable setup procedure.** Hand this repo to an agent and it executes this — with hard rules it must not break and 🛑 stops where you decide |
-| [`docs/01-what-you-are-installing.md`](docs/01-what-you-are-installing.md) | An honest inventory of the capabilities and trust decisions you're accepting — read before `npm install` |
-| [`docs/02-architecture.md`](docs/02-architecture.md) | How a message becomes an action: request flow, agents, sessions, skills, MCP |
-| [`docs/03-security.md`](docs/03-security.md) | Threat model, exec policy, sandboxing, secrets, channel exposure, hardening checklist |
-| [`docs/04-operating-it.md`](docs/04-operating-it.md) | Keeping it alive: health checks that don't lie, restart logic that works, alert fatigue, and the failure modes that cost me a summer |
-| [`docs/05-local-llm-16gb.md`](docs/05-local-llm-16gb.md) | **Local models on 16GB** — which model for which job, the memory budget nobody mentions, and the three settings (`think`, `num_ctx`, `keep_alive`) that decide whether local inference works at all |
-| [`docs/06-essential-tool-calls.md`](docs/06-essential-tool-calls.md) | **Which capabilities to enable, in what order**, tiered by risk — plus the allowlist rule that quietly undoes a "cautious" setup |
+If something misbehaves: `openclaw doctor`, then `openclaw status`, then `openclaw logs`, then `df -h /`. Do not debug by loosening policy.
 
----
-
-## Why bother at all
-
-A chat app is the best interface ever built for an assistant. It's on your
-phone, it's asynchronous, it has history, notifications, groups, and files. You
-already live in it.
-
-What OpenClaw adds is that the thing answering can **do** something: read a
-document, run a script, check a service, remember what you told it last week.
-The gap between "AI that talks" and "AI that acts" is almost entirely about
-whether it has safe, governed access to your actual machine — which is why this
-repo spends more words on policy than on prompts.
+A setup you can defend on day one: **one channel, one agent, `cautious`, no extra MCP servers.** Add capability when you hit a real limit, not in anticipation of one.
 
 ---
 
-## Credits & scope
+## System diagram
 
-- **OpenClaw** is by its own authors — [npm](https://www.npmjs.com/package/openclaw).
-  Bugs and features belong upstream, not here.
-- This repo is documentation and diagrams only. **No credentials, no private
-  configuration, and no personal data appear anywhere in it** — every key,
-  token, ID, and path in these docs is a placeholder.
-- Corrections welcome. Some of this will drift as OpenClaw evolves; when in
-  doubt, `openclaw <command> --help` and `openclaw docs` are the source of
-  truth.
+A message on your phone becomes an action on your machine only if pairing and policy allow it.
 
-*Fork it. Improve it. Make it better. Share it.*
+```mermaid
+flowchart TB
+  you[You] --> ch[Channel]
+  ch --> pair[Pairing]
+  pair --> gw[Gateway]
+  gw --> ag[Agent]
+  ag --> pol[Policy]
+  pol --> models[Models]
+  pol --> skills[Skills]
+  pol -.-> shell[Shell]
+```
+
+The model *asks*. Policy decides. That split is the safety architecture — setting the preset to `yolo` removes it. Full path, including sandbox and memory: [`docs/02-architecture.md`](docs/02-architecture.md).
+
+---
+
+## License / contributing
+
+[MIT](LICENSE). Copyright © 2026 **Non Arkaraprasertkul / Axiom X Co., Ltd.**
+
+Reuse the prose, diagrams, and procedure with attribution. The grant covers **this repository**. It does not relicense OpenClaw, model weights, chat platforms, or anyone else's credentials.
+
+Corrections welcome. Open a pull request against `main`. Keep the voice: a field guide, not a vendor pitch. Do not add live tokens, private paths, or a second channel "to make the demo richer." Do not weaken a security rule in `AGENTS.md` to make a step easier. When OpenClaw drifts, `openclaw <command> --help` and `openclaw docs` are the source of truth.
+
+If you fork this into a gateway people actually message, read [`docs/03-security.md`](docs/03-security.md) before the first inbound DM.
+
+*Fork the method. Keep the keys. Bind loopback.*
