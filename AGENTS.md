@@ -14,9 +14,10 @@
 Install and configure OpenClaw on this machine so it is **useful and safe by
 default**, then hand back a working system with a short report.
 
-**Success looks like:** gateway running, one channel connected, exec policy at
-`cautious` or stricter, `security audit` clean, local models installed and
-matched to purpose, and the human knowing what they now have.
+**Success looks like:** gateway running on loopback (typically
+`127.0.0.1:18789`), exec policy at `cautious` or `deny-all`, `security audit`
+findings read (not just exit 0), at most one channel connected, local models
+matched to RAM if Ollama is present, and the human knowing what they now have.
 
 ---
 
@@ -59,7 +60,7 @@ sysctl -n hw.memsize 2>/dev/null | awk '{printf "RAM: %.0f GB\n", $1/1073741824}
 free -g 2>/dev/null | head -2                                                        # Linux
 
 # Prerequisites
-node --version          # need 20+
+node --version          # need 24.16+ (upstream currently recommends Node 26)
 npm --version
 docker --version        # optional but strongly recommended (sandboxing)
 ollama --version        # optional (local models)
@@ -68,13 +69,14 @@ ollama --version        # optional (local models)
 df -h /
 ```
 
-**Report to the human:** OS, RAM, whether Node 20+ / Docker / Ollama are
+**Report to the human:** OS, RAM, whether Node 24.16+ / Docker / Ollama are
 present, and free disk.
 
-🛑 **Stop if:** Node is below 20, or free disk is under ~10GB. Tell the human
+🛑 **Stop if:** Node is below 24.16, or free disk is under ~10GB. Tell the human
 what's missing rather than working around it. *(Low disk is not cosmetic — on
 machines where swap shares the boot volume, a full disk makes local model
-allocation fail in ways that look like model bugs.)*
+allocation fail in ways that look like model bugs. Node 20 is too old for
+current OpenClaw.)*
 
 ---
 
@@ -97,11 +99,11 @@ outside world.
 
 ```bash
 openclaw exec-policy preset cautious
-openclaw exec-policy preset      # confirm what is now set
+openclaw exec-policy show        # confirm what is now set — read the words
 ```
 
-**Verify** the output says `cautious` (or `deny-all`). If it says anything
-else, stop and report.
+**Verify** the printed preset is `cautious` (or `deny-all`). An exit code of 0
+with some other preset is a finding. If it says anything else, stop and report.
 
 🛑 **Ask the human:** *"Should the agent be able to run shell commands at all?"*
 - Wants it to run scripts / check services / build things → `cautious`
@@ -115,14 +117,31 @@ else, stop and report.
 openclaw onboard
 ```
 
-This is interactive and will ask for credentials.
+This is interactive and will ask for credentials. Prefer the classic /
+step-by-step path (`openclaw onboard --classic`) over a one-prompt Quick
+start — Quick start is designed to get chatting fast, which is the opposite
+of this order.
 
 🛑 **Hand the keyboard to the human for every credential prompt.** Explain
 what each one is for, then let them type it. Do not read keys from their
 environment, their files, or their clipboard and paste them in.
 
+Keep the gateway on **loopback**. If the wizard asks how to bind, choose
+loopback / `127.0.0.1`. Skip extra channels, extra MCP servers, and extra
+agents.
+
 If `onboard` isn't viable non-interactively, use `openclaw configure`, still
 handing over for secrets.
+
+After onboard, persist the service and prove it is local:
+
+```bash
+openclaw gateway install
+openclaw gateway status    # listener on 127.0.0.1, typically port 18789
+```
+
+If it is listening on `0.0.0.0` or a LAN address, stop and report. Do not
+"fix" that by leaving it exposed.
 
 ---
 
@@ -162,11 +181,21 @@ curl -s http://127.0.0.1:11434/api/chat -d '{
 > a success status**. `"keep_alive": 0` releases the model afterwards instead
 > of pinning several GB for minutes.
 
-Then register with OpenClaw:
+Then ask OpenClaw what it can see. `openclaw models scan` ranks OpenRouter's
+public `:free` catalog — it is **not** local Ollama discovery.
 
 ```bash
-openclaw models scan
-openclaw models list
+openclaw models list --provider ollama
+openclaw models status
+```
+
+If the pulled ids are missing from that list, say so. Do not paste an
+OpenRouter key to "make scan work." During onboard the human can choose
+Ollama → Local so the gateway discovers `http://127.0.0.1:11434`. To pin a
+default afterwards (use an id `models list` actually printed):
+
+```bash
+openclaw models set ollama/qwen3:4b
 ```
 
 ---
@@ -174,22 +203,28 @@ openclaw models list
 ## Step 5 — Connect exactly one channel
 
 ```bash
-openclaw channels
+openclaw channels status
 ```
 
 🛑 **Ask the human which channel** and let them authenticate it themselves.
 
 **One channel first.** Confirm the whole path works before adding a second.
 
-Then require approval for inbound strangers:
+Then require approval for inbound strangers. These are two different
+surfaces — do not treat them as one command:
 
 ```bash
-openclaw pairing        # inbound DM approval
-openclaw devices        # paired devices
+openclaw pairing list <channel>    # inbound DMs, e.g. telegram
+openclaw devices list              # phones / browsers talking to the gateway
 ```
 
-**Verify:** send a message from the connected app and confirm a reply. If
-nothing arrives, `openclaw logs` and `openclaw doctor` before changing config.
+Approve only what the human recognises (`openclaw pairing approve …`,
+`openclaw devices approve <requestId>`). Preview-only `devices approve`
+without an id does **not** approve anything.
+
+**Verify:** send a message from the connected, paired account and confirm a
+reply. If nothing arrives, `openclaw doctor`, then `openclaw status`, then
+`openclaw logs`, then `df -h /` before changing config.
 
 ---
 
@@ -202,9 +237,11 @@ openclaw sandbox list
 openclaw sandbox explain     # the EFFECTIVE policy, not your intent
 ```
 
-Read `explain` carefully — effective policy is the product of several layers,
-and the surprise is rarely what you configured, it's what the layers combine
-into.
+Sandbox mode is opt-in: `off`, `non-main`, or `all`. Read `explain` carefully
+— effective policy is the product of several layers, and the surprise is
+rarely what you configured, it's what the layers combine into. Config
+changes do not rewrite a running container; `openclaw sandbox recreate`
+(with `--agent` / `--all` as appropriate) rebuilds from current config.
 
 If Docker is missing, say so plainly: *"Sandboxing is unavailable. The agent
 can reach the real filesystem when it executes. Install Docker to contain it."*
@@ -216,6 +253,8 @@ Do not silently proceed as though it were equivalent.
 
 ```bash
 openclaw security audit
+openclaw secrets audit --check
+openclaw gateway status      # prove loopback, typically 127.0.0.1:18789
 openclaw status
 openclaw health
 ```

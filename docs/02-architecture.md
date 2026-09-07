@@ -16,7 +16,7 @@ sequenceDiagram
     participant U as 📱 You
     participant CH as Channel<br/>(Telegram/Discord)
     participant GW as Gateway
-    participant PAIR as Pairing check
+    participant PAIR as Channel pairing
     participant AG as Agent
     participant MEM as Session + Memory
     participant POL as Exec policy
@@ -49,10 +49,19 @@ sequenceDiagram
     CH->>U: "site is up, 204ms"
 ```
 
-**Note step 9.** The model *asks* to run a command; it does not run one. The
-policy layer decides. That separation is the whole safety architecture — which
-is why setting the policy to `yolo` isn't a convenience tweak, it's removing
-the architecture.
+**Note the policy step.** The model *asks* to run a command; it does not run
+one. The policy layer decides. That separation is the whole safety
+architecture — which is why setting the policy to `yolo` isn't a convenience
+tweak, it's removing the architecture.
+
+Two pairing surfaces sit on this path, and newcomers mix them up:
+
+| Surface | Command | Question it answers |
+|---|---|---|
+| Channel pairing | `openclaw pairing list <channel>` / `approve` | Who may DM the bot? |
+| Device pairing | `openclaw devices list` / `approve <requestId>` | Which phone or browser may talk to the gateway? |
+
+A larger, labelled version of this path: [`diagrams/README.md`](../diagrams/README.md#a-message--gates--action).
 
 ---
 
@@ -172,14 +181,19 @@ A cheat-sheet mapping "I want to control X" to the actual command:
 
 | You want to control… | Command |
 |---|---|
-| Whether commands run at all | `openclaw exec-policy preset <deny-all\|cautious\|yolo>` |
-| Which specific commands are pre-approved | `openclaw approvals allowlist` |
-| What a command can reach when it runs | `openclaw sandbox` |
-| Who may message the bot | `openclaw pairing`, `openclaw devices` |
-| Which models get used | `openclaw models` |
+| Whether commands run at all | `openclaw exec-policy preset <deny-all\|cautious>` then `show` |
+| Which specific commands are pre-approved | `openclaw approvals allowlist add <pattern>` / `openclaw approvals get` |
+| What a command can reach when it runs | `openclaw sandbox explain` (mode is `off` / `non-main` / `all`) |
+| Who may DM the bot | `openclaw pairing list <channel>` / `approve` |
+| Which phone or browser may talk to the gateway | `openclaw devices list` / `approve <requestId>` |
+| Which models get used | `openclaw models list`, `openclaw models set …` |
 | What background jobs exist | `openclaw cron`, `openclaw tasks` |
 | What it remembers | `openclaw memory`, `openclaw sessions` |
-| Whether config is sane | `openclaw security audit`, `openclaw doctor` |
+| Whether config is sane | `openclaw security audit`, `openclaw secrets audit --check`, `openclaw doctor` |
+
+`yolo` is a real upstream preset. This table omits it on purpose — it is not a
+control you should be reaching for. Confirm whatever you set with
+`openclaw exec-policy show`.
 
 ---
 
@@ -206,5 +220,9 @@ whose failure is genuinely independent.
 
 ```bash
 openclaw models list
-openclaw models scan     # discover what's available
+openclaw models list --provider ollama    # local host, after Ollama is up
+openclaw models status
 ```
+
+`openclaw models scan` ranks OpenRouter's public `:free` catalog. It is not
+how you register a model you just `ollama pull`'d.

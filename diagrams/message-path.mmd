@@ -1,0 +1,43 @@
+%% Message → gates → action. The model asks; policy decides.
+flowchart TB
+  subgraph inbound["1. Inbound"]
+    YOU["You send a message"]
+    CH["Chat channel<br/>Telegram / Discord / …"]
+    YOU --> CH
+  end
+
+  subgraph identity["2. Who is this?"]
+    PAIR{"Sender paired<br/>and approved?"}
+    DROP["Stopped here<br/>pairing code only"]
+  end
+
+  subgraph brain["3. Gateway on this machine"]
+    GW["Gateway<br/>bound to 127.0.0.1"]
+    AG["Agent + session memory"]
+    MODEL["Model<br/>asks for a tool"]
+    GW --> AG --> MODEL
+  end
+
+  subgraph policy["4. May it act?"]
+    POL{"Exec policy"}
+    DENY["deny-all<br/>refused"]
+    ASK["cautious<br/>you approve this command"]
+    YOLO["yolo<br/>no ask — do not use"]
+  end
+
+  subgraph run["5. If allowed"]
+    SBX["Sandbox if enabled<br/>Docker / Podman"]
+    TOOL["Tool / skill / MCP"]
+    REPLY["Reply back on the channel"]
+  end
+
+  CH --> PAIR
+  PAIR -->|no| DROP
+  PAIR -->|yes| GW
+  MODEL --> POL
+  POL -->|deny-all| DENY
+  POL -->|cautious| ASK
+  ASK -->|you say no| DENY
+  ASK -->|you say yes| SBX
+  POL -->|yolo — never the default| SBX
+  SBX --> TOOL --> REPLY

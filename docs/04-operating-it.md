@@ -133,11 +133,16 @@ cleanup. And don't `exec` inside the wrapper: it replaces the shell, so your
 ## A monitoring setup that earns its keep
 
 ```bash
-openclaw status      # gateway, channels, models, sessions
-openclaw health      # detailed gateway health
-openclaw doctor      # diagnose + repair
-openclaw logs        # tail
+openclaw gateway status   # listener, bind, last error — prove loopback
+openclaw status           # gateway, channels, models, sessions
+openclaw health           # detailed gateway health
+openclaw doctor           # diagnose + repair
+openclaw logs             # tail
 ```
+
+`openclaw gateway status` is the line that tells you whether the process is
+actually listening, and on which address. Trust `Listening:` and
+`Probe target:` more than a supervisor that says "running".
 
 Wrap them in a watchdog that checks, in this order — each rules out everything
 above it:

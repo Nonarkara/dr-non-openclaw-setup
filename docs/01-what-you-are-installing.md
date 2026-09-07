@@ -11,7 +11,8 @@
 OpenClaw installs a **persistent background service** that connects your chat
 apps to AI models and, if you let it, to a **shell on your computer.**
 
-Every clause there is a decision you are making.
+Every clause there is a decision you are making. The maps:
+[`diagrams/`](../diagrams/) — message path, security layers, first-week order.
 
 ---
 
@@ -57,9 +58,11 @@ Those keys are spendable money and, for some providers, access to your account.
 
 ### 4. It's reachable from your phone
 
-Device pairing and QR setup let you talk to your machine from anywhere. That
-convenience is also a remote-access path, and it should be authenticated,
-revocable, and never a bare open port.
+Device pairing (`openclaw devices list` / `approve`) lets you talk to your
+machine from a phone or another browser. That convenience is also a
+remote-access path. It should be authenticated, revocable, and never a bare
+open port. Channel pairing (`openclaw pairing list` / `approve`) is a
+different surface: who may DM the bot.
 
 ---
 
@@ -85,21 +88,33 @@ answer later.
 
 ## What good looks like on day one
 
-A setup you can defend, that still does something useful:
+A setup you can defend, that still does something useful. **Policy before
+onboard, onboard before a channel.**
 
 ```bash
 npm install -g openclaw
-openclaw onboard                       # guided: gateway, workspace, auth, channels
-
 openclaw exec-policy preset cautious   # ask before executing anything
+openclaw exec-policy show              # read the words, not the exit code
+
+openclaw onboard                       # you type every secret; bind loopback
+openclaw gateway install
+openclaw gateway status                # prove 127.0.0.1, typically :18789
+
 openclaw security audit                # surface foot-guns immediately
+openclaw secrets audit --check
 openclaw sandbox explain               # confirm EFFECTIVE policy, not intent
-openclaw status                        # gateway, channels, models
 ```
 
-One channel. One agent. `cautious`. No MCP servers yet. Live with that for a
-week; add capability when you hit an actual limitation, not in anticipation of
-one.
+Need **Node.js 24.16+** (upstream currently recommends Node 26). Node 20 is
+too old for current OpenClaw.
+
+Zero channels until pairing is understood, then **one** channel, one agent,
+`cautious` or `deny-all`, no MCP servers yet. Live with that for a week; add
+capability when you hit an actual limitation, not in anticipation of one.
+
+Sandboxing is **opt-in** (`off` / `non-main` / `all`). If Docker or Podman is
+missing, write that down — a command that runs can then reach the real
+filesystem.
 
 ---
 

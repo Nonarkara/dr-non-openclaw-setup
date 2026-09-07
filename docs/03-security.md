@@ -26,15 +26,19 @@ its job. Treat every byte it reads from the outside as *data*, never as
 instructions, and never let "the model decided to" be the only thing standing
 between a web page and your shell.
 
+Layers, drawn: [`diagrams/README.md`](../diagrams/README.md#b-security-layers).
+Set them in the first-week order: [`diagrams/README.md`](../diagrams/README.md#c-first-week-order).
+
 ---
 
 ## The single most consequential setting: exec policy
 
 ```bash
 openclaw exec-policy preset cautious
+openclaw exec-policy show
 ```
 
-Three presets:
+Three presets (the third is named so you can recognise it — not so you set it):
 
 | Preset | Behaviour | Use when |
 |---|---|---|
@@ -56,8 +60,8 @@ Blanket approval is blunt. An allowlist lets a specific agent run a specific,
 enumerated set of commands without prompting every time:
 
 ```bash
-openclaw approvals allowlist       # edit the per-agent allowlist
-openclaw approvals get             # what is actually approved right now
+openclaw approvals allowlist add "/usr/bin/uptime"   # specific path, not a shell
+openclaw approvals get                               # what is actually approved
 ```
 
 Good allowlist entries are **specific and read-only-ish**: a status check, a
@@ -75,12 +79,19 @@ it does.* You want both.
 ```bash
 openclaw sandbox list        # containers and status
 openclaw sandbox explain     # the effective policy for a session/agent
-openclaw sandbox recreate    # rebuild after config changes
+openclaw sandbox recreate --all   # rebuild after config changes; next use reseeds
 ```
+
+Sandboxing is **opt-in**. `agents.defaults.sandbox.mode` is `off` (host),
+`non-main` (only non-main sessions), or `all`. A common surprise: in
+`non-main`, a group or channel session is **not** "main", so it is sandboxed
+when you thought it wasn't — or the reverse.
 
 `sandbox explain` deserves a habit. Effective policy is the product of several
 layers, and the surprising part is not what you configured — it's what those
-layers combine into. Check the *effective* policy, not your intent.
+layers combine into. Check the *effective* policy, not your intent. Config
+edits do not rewrite a running container; recreate, then prove the new
+`explain` output.
 
 Run agents that touch untrusted content — anything reading the web, email, or
 messages from strangers — **inside a sandbox**, and give them the narrowest
@@ -91,9 +102,16 @@ filesystem mount that still does the job.
 ## Secrets
 
 ```bash
-openclaw security audit      # run this today, and after every config change
-openclaw secrets audit       # SecretRef-backed credential inventory
+openclaw security audit           # run this today, and after every config change
+openclaw security audit --deep    # adds a live Gateway probe; optional
+openclaw secrets audit --check    # plaintext, unresolved refs, precedence drift
+openclaw secrets configure        # interactive SecretRef planner (you type)
 ```
+
+`--fix` on `security audit` applies a small, documented set of safe
+remediations (file permissions, some open group policies). It will not rotate
+keys, disable tools, or change bind/auth. Do not treat a clean exit as a
+clean system — read the findings.
 
 Rules that prevent the incidents that actually happen:
 
@@ -117,9 +135,10 @@ grep -rInE "sk-[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}|[0-9]{9,10}:AA[A-Za-z0-9_-]
 Adding a chat channel means a message from outside can now reach a process on
 your machine. That is fine — it's the point — provided you control *who*.
 
-- **Require pairing/approval for inbound DMs.** `openclaw pairing` exists for
-  exactly this. Without it, anyone who finds your bot is talking to your
-  gateway.
+- **Require pairing/approval for inbound DMs.** Default `dmPolicy` is
+  `"pairing"`: unknown senders get a code, not an action. Inspect and approve
+  with `openclaw pairing list <channel>` and `openclaw pairing approve …`.
+  Without that, anyone who finds your bot is talking to your gateway.
 - **Groups are a different trust level than DMs.** Anyone in a group can
   address the bot. Assume group content is untrusted, always.
 - **Bot tokens are credentials.** A leaked token lets someone impersonate your
@@ -133,8 +152,10 @@ your machine. That is fine — it's the point — provided you control *who*.
 
 - **Bind to loopback** unless you have a specific reason not to. The control
   plane is not something to expose to a LAN, let alone the internet.
-- **For phone access, use device pairing** (`openclaw devices`, `openclaw qr`)
-  rather than opening a port. Pairing gives revocable per-device tokens.
+- **For phone or extra-browser access, use device pairing**
+  (`openclaw devices list`, `openclaw devices approve <requestId>`) rather
+  than opening a port. Pairing gives revocable per-device tokens. Approving
+  without an id only *previews* the newest request.
 - **If you must reach it remotely, tunnel it** with something that
   authenticates (Tailscale, an authenticated reverse proxy) — never a bare
   public port.
@@ -164,17 +185,20 @@ The general principle: **an MCP server is a privilege grant, not a plugin.**
 
 Work down this list once; re-run the audits after any config change.
 
-- [ ] `openclaw exec-policy preset cautious` (or `deny-all`)
-- [ ] `openclaw security audit` — clean
-- [ ] `openclaw sandbox explain` — effective policy matches what you *think*
-- [ ] Sandboxing enabled for any agent touching untrusted content
-- [ ] Inbound DM pairing/approval required
+- [ ] `openclaw exec-policy show` prints `cautious` or `deny-all`
+- [ ] `openclaw gateway status` shows a **loopback** listener (typically `127.0.0.1:18789`)
+- [ ] `openclaw security audit` — findings read, not just exit 0
+- [ ] `openclaw secrets audit --check` — no unexpected plaintext
+- [ ] `openclaw sandbox explain` — effective mode matches what you *think*
+- [ ] Sandboxing enabled (`non-main` or `all`) for any agent touching untrusted content
+- [ ] Inbound DM pairing required; `pairing list <channel>` reviewed
+- [ ] Device pairing reviewed (`devices list`); unused devices removed
 - [ ] Gateway bound to loopback; remote access via pairing or authenticated tunnel
 - [ ] Allowlist contains no shells, interpreters, or package managers
-- [ ] Provider keys via SecretRef, not inline in config
+- [ ] Provider keys via SecretRef / secrets store, not inline in config
 - [ ] Config and state directories excluded from any repo you publish
 - [ ] Secret scan passes before every push
-- [ ] Unused devices and channels removed
+- [ ] Unused channels removed
 - [ ] Each added MCP server's tool list reviewed
 - [ ] Backups exist and have been **restored once** to prove they work
 

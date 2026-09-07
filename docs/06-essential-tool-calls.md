@@ -63,7 +63,8 @@ A per-agent allowlist pre-approves specific commands so you aren't prompted
 constantly:
 
 ```bash
-openclaw approvals allowlist
+openclaw approvals allowlist add "/usr/bin/uptime"   # example: specific path
+openclaw approvals get
 ```
 
 **Good entries** are specific and effectively read-only — a status check, a log
@@ -115,9 +116,10 @@ Genuinely useful, defensible, and a foundation you can add to:
 
 ```bash
 openclaw exec-policy preset cautious       # ask before executing
-openclaw approvals allowlist               # add 2-3 specific safe commands
+openclaw exec-policy show                  # read the words
+openclaw approvals allowlist add "/usr/bin/uptime"
 openclaw sandbox explain                   # confirm isolation is real
-openclaw security audit                    # clean before you proceed
+openclaw security audit                    # read findings before you proceed
 ```
 
 Plus: **one** channel with pairing required, local models for embeddings and
