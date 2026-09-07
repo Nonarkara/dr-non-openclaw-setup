@@ -12,3 +12,4 @@ Short version if you only read this file:
 4. Never bind the gateway beyond `127.0.0.1`.
 5. Never weaken a security control to make a step succeed.
 6. Verify after every step — exit code 0 is not evidence it worked.
+7. Confirm policy with `openclaw exec-policy show`. `models scan` is not local Ollama discovery.

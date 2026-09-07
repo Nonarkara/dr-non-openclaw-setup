@@ -1,0 +1,28 @@
+%% Five layers. Each one fails closed. Do not skip a layer to “make it work”.
+flowchart TB
+  subgraph L1["Layer 1 — Who may talk"]
+    P["openclaw pairing list / approve<br/>Inbound DMs need a pairing code"]
+    D["openclaw devices list / approve<br/>Phones and browsers are devices, not ports"]
+  end
+
+  subgraph L2["Layer 2 — Where it listens"]
+    B["gateway.bind = loopback<br/>127.0.0.1 only"]
+    R["Remote reach = pairing or an authenticated tunnel<br/>Never 0.0.0.0, never a bare public port"]
+  end
+
+  subgraph L3["Layer 3 — Whether a command may run"]
+    E["openclaw exec-policy preset cautious<br/>or deny-all"]
+    S["openclaw exec-policy show<br/>Read the effective preset — do not trust the exit code"]
+  end
+
+  subgraph L4["Layer 4 — What a command can reach"]
+    X["openclaw sandbox explain<br/>Effective mode: off / non-main / all"]
+    W["No Docker? Say so. The host filesystem is then in play."]
+  end
+
+  subgraph L5["Layer 5 — What it may hold"]
+    K["SecretRefs / secrets store<br/>Keys are references, not files in git"]
+    A["openclaw security audit<br/>openclaw secrets audit --check"]
+  end
+
+  L1 --> L2 --> L3 --> L4 --> L5

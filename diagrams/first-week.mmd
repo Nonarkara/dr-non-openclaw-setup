@@ -1,0 +1,45 @@
+%% Recommended first-week order. Policy before any inbound path.
+flowchart TB
+  subgraph hour0["Hour 0 — still offline"]
+    direction TB
+    A["1. Survey the machine<br/>Node 24.16+ · disk · Docker · Ollama"]
+    B["2. Install the CLI"]
+    C["3. Set exec policy<br/>cautious or deny-all"]
+    D["4. Confirm with exec-policy show"]
+    A --> B --> C --> D
+  end
+
+  subgraph hour1["Hour 1 — local only"]
+    direction TB
+    E["5. Onboard — you type every secret"]
+    F["6. Install the gateway service<br/>confirm 127.0.0.1:18789"]
+    G["7. security audit + sandbox explain"]
+    E --> F --> G
+  end
+
+  subgraph day2["Day 2 — optional local models"]
+    direction TB
+    H["8. Pull small Ollama models"]
+    I["9. Prove a real reply<br/>then models list --provider ollama"]
+    H --> I
+  end
+
+  subgraph day3["Day 3 — one inbound path"]
+    direction TB
+    J["10. Connect exactly one channel"]
+    K["11. pairing list / approve<br/>devices list"]
+    L["12. Your message gets a reply<br/>a stranger's does not"]
+    J --> K --> L
+  end
+
+  subgraph week["The rest of the week"]
+    direction TB
+    M["13. Live with one agent,<br/>one channel, cautious"]
+    N["14. Add a tool only when<br/>you hit a real limit"]
+    M --> N
+  end
+
+  D --> E
+  G --> H
+  I --> J
+  L --> M

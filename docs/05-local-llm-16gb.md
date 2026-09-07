@@ -156,6 +156,23 @@ primary (cloud) → alternate (cloud) → LOCAL   ← the only independent rung
 
 ---
 
+## Register what you pulled
+
+`openclaw models scan` ranks OpenRouter's public `:free` catalog. It will not
+show a model you just pulled into Ollama. After the curl below succeeds:
+
+```bash
+openclaw models list --provider ollama
+openclaw models status
+```
+
+During `openclaw onboard`, choose **Ollama → Local** so the gateway discovers
+`http://127.0.0.1:11434` (native `/api/chat`, not the `/v1` OpenAI-compatible
+URL — that path breaks tool calling). To pin a default, use an id the list
+actually printed: `openclaw models set ollama/qwen3:4b`.
+
+---
+
 ## Verify a model actually works
 
 Never trust `ollama pull`. Trust a reply.
