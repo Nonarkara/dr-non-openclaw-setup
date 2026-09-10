@@ -30,7 +30,8 @@ This repository is independent studio writing. It is **not** an official depa, A
 5. [Let an agent do the tedious parts](#let-an-agent-do-the-tedious-parts)
 6. [Verification checklist](#verification-checklist)
 7. [Troubleshooting](#troubleshooting)
-8. [Philosophy](#philosophy)
+8. [Grok Bot–shaped tool surface](#grok-botshaped-tool-surface)
+9. [Philosophy](#philosophy)
 9. [Ethical use](#ethical-use)
 10. [What's in this tree](#whats-in-this-tree)
 11. [License / contributing](#license--contributing)
@@ -71,7 +72,7 @@ It is a **learner's guide**, not a product. Bugs and features belong [upstream](
 - Credentials, private config, personal paths, or a dump of tokens. Every key, ID, and path in these docs is a placeholder.
 - A ranking, a dashboard, or a government system.
 
-Related public work: [agentic AI council](https://github.com/Nonarkara/dr-non-agentic-ai-council) (OpenClaw as one engine among several), [offline AI coding](https://github.com/Nonarkara/offline-ai-coding), [live-coding bible](https://github.com/Nonarkara/live-coding-bible).
+Related public work: [second-brain-os](https://github.com/Nonarkara/second-brain-os), [dr-non-vibecoding-skills](https://github.com/Nonarkara/dr-non-vibecoding-skills) (`obsidian-mcp-forge`), [agentic AI council](https://github.com/Nonarkara/dr-non-agentic-ai-council) (OpenClaw as one engine among several), [offline AI coding](https://github.com/Nonarkara/offline-ai-coding), [live-coding bible](https://github.com/Nonarkara/live-coding-bible).
 
 ### What good looks like on day one
 
@@ -341,6 +342,24 @@ Stuck? Report the exact command, the exact output, and what you have ruled out. 
 
 ---
 
+
+## Grok Bot–shaped tool surface
+
+Dr Non now runs day-to-day on **Grok Bot**. This OpenClaw guide stays useful for
+anyone who wants a **self-hosted multi-channel gateway** with a comparable desk:
+shell (cautious), files, web, browser, cron, sub-agents, skills, and the
+Obsidian MCP memory forge.
+
+| Read | For |
+|---|---|
+| [`docs/06-essential-tool-calls.md`](docs/06-essential-tool-calls.md) | Risk tiers — what to enable when |
+| [`docs/07-grok-bot-parity.md`](docs/07-grok-bot-parity.md) | Map Grok desk jobs → OpenClaw tools / MCP / cron |
+| [second-brain-os](https://github.com/Nonarkara/second-brain-os) | A+ filesystem Obsidian forge (recall / capture / eval) |
+| [obsidian-mcp-forge skill](https://github.com/Nonarkara/dr-non-vibecoding-skills/tree/main/skills/obsidian-mcp-forge) | Vibecoding skill for the same memory machine |
+
+Upstream tool index: [docs.openclaw.ai/tools](https://docs.openclaw.ai/tools). CLI names drift — believe `--help`.
+
+---
 ## Philosophy
 
 Four studio tenets. They are how this repo is meant to be forked, not slogans.
@@ -394,10 +413,11 @@ If a contribution would only work by pasting a secret, it does not belong here.
 | [`docs/04-operating-it.md`](docs/04-operating-it.md) | Keeping it alive unattended: health checks that don't lie, restarts that restart, quiet failure modes |
 | [`docs/05-local-llm-16gb.md`](docs/05-local-llm-16gb.md) | Local models on a 16GB machine — which job for which model, and why the RAM number lies |
 | [`docs/06-essential-tool-calls.md`](docs/06-essential-tool-calls.md) | Which tools to enable, in what order, tiered by risk |
+| [`docs/07-grok-bot-parity.md`](docs/07-grok-bot-parity.md) | Grok Bot desk jobs → OpenClaw tools / MCP / cron / Obsidian forge |
 | [`diagrams/`](diagrams/) | Message path, security layers, first-week order — mermaid and PNG |
 | [`docs/hero-banner.png`](docs/hero-banner.png) | The illustration at the top of this page |
 
-Going further, in order: [`docs/04-operating-it.md`](docs/04-operating-it.md) (it will fail quietly), then [`docs/06-essential-tool-calls.md`](docs/06-essential-tool-calls.md) when you hit a real limit.
+Going further, in order: [`docs/04-operating-it.md`](docs/04-operating-it.md) (it will fail quietly), then [`docs/06-essential-tool-calls.md`](docs/06-essential-tool-calls.md) when you hit a real limit, then [`docs/07-grok-bot-parity.md`](docs/07-grok-bot-parity.md) for the Grok-shaped desk.
 
 ---
 

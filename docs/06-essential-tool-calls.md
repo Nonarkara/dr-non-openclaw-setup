@@ -3,6 +3,11 @@
 > Which capabilities to turn on, in what order, and what each one costs you in
 > risk. Sorted so you can stop reading at your comfort level.
 
+**Want the Grok Bot–shaped desk on OpenClaw?** Read
+[`07-grok-bot-parity.md`](07-grok-bot-parity.md) after this page. It maps
+message / shell / memory / web / browser / cron / subagents / MCP forge to
+current OpenClaw tools ([docs.openclaw.ai/tools](https://docs.openclaw.ai/tools)).
+
 A "tool call" is the agent asking to *do* something rather than say something.
 Every tool you enable is a trade: more usefulness, more surface. The mistake is
 enabling everything on day one and then having no idea which thing let a web
@@ -93,6 +98,36 @@ speaks publicly as you — draft, don't send.** The agent prepares; you approve.
 You lose almost no speed and remove nearly all the tail risk.
 
 ---
+
+
+
+---
+
+## Named OpenClaw tools (2026 upstream vocabulary)
+
+When docs or dashboards show tool ids, these are the ones that matter for a
+Grok-like desk. Exact availability depends on **tool profile**, allow/deny,
+sandbox, and plugins — see upstream *Tools and custom providers*.
+
+| Desk need | Representative tool ids |
+|---|---|
+| Shell / processes | `exec`, `process`, `terminal`, `code_execution` |
+| Files | `read`, `write`, `edit`, `apply_patch` |
+| Human gate | `ask_user`, `secrets` |
+| Web | `web_search`, `web_fetch`, `x_search` |
+| Browser | `browser` (add via `tools.alsoAllow` on coding profile) |
+| Message out | `message` |
+| Sessions / delegate | `sessions_spawn`, `subagents`, `sessions_*`, goals |
+| Schedule | `cron`, heartbeat / automations |
+| Media | `view_image`, `image_generate`, `tts`, … |
+| Large catalogs | `tool_search`, Code Mode (experimental) |
+
+**Browser note:** `tools.profile: "coding"` includes web search/fetch but **not**
+full `browser` until you `alsoAllow` it. Sub-agents inherit that filter.
+
+**Obsidian / second brain:** prefer the filesystem MCP forge
+([second-brain-os](https://github.com/Nonarkara/second-brain-os)) over random
+`npx` packages — same A+ path documented for Grok Bot vibecoding.
 
 ## MCP servers are privilege grants
 

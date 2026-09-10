@@ -317,3 +317,19 @@ ruled out. That is more useful than a workaround.
 Every step is idempotent. It is safe to run again to verify or repair an
 existing install. Re-running never *loosens* configuration — if you find the
 policy at `yolo`, set it back to `cautious` and tell the human you did.
+
+---
+
+## Optional phase — Grok Bot–shaped tool surface
+
+Only after Week-0 safety (policy, audit, ≤1 channel) is boring.
+
+1. Read [`docs/07-grok-bot-parity.md`](docs/07-grok-bot-parity.md) and [`docs/06-essential-tool-calls.md`](docs/06-essential-tool-calls.md).
+2. Enable **one** of: scoped filesystem write, `web_fetch`, or Obsidian MCP forge — not all at once.
+3. For coding-like desks: ensure tool profile can see `read`/`write`/`edit`/`exec` under cautious policy; add `browser` only via `alsoAllow` when needed.
+4. For memory: wire filesystem `obsidian-bridge` via `openclaw mcp add` pointing at the human's vault forge ([second-brain-os](https://github.com/Nonarkara/second-brain-os)). Probe tools before claiming success.
+5. For routines: one `cron` / automation job that announces only on change.
+6. **Never** enable email-send, payments, or production deploys as agent tools in this phase.
+
+Report which tools are visible to the agent (`openclaw mcp tools` / effective policy) — not just that config was written.
+
