@@ -32,9 +32,9 @@ This repository is independent studio writing. It is **not** an official depa, A
 7. [Troubleshooting](#troubleshooting)
 8. [Grok Bot–shaped tool surface](#grok-botshaped-tool-surface)
 9. [Philosophy](#philosophy)
-9. [Ethical use](#ethical-use)
-10. [What's in this tree](#whats-in-this-tree)
-11. [License / contributing](#license--contributing)
+10. [Ethical use](#ethical-use)
+11. [What's in this tree](#whats-in-this-tree)
+12. [License / contributing](#license--contributing)
 
 ---
 
