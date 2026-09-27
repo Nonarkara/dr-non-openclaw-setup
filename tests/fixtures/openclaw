@@ -1,0 +1,198 @@
+#!/usr/bin/env bash
+# Fake openclaw for unit tests. State lives in OPENCLAW_FIXTURE_DIR.
+set -euo pipefail
+
+DIR="${OPENCLAW_FIXTURE_DIR:?fixture dir required}"
+LOG="${OPENCLAW_FIXTURE_LOG:?fixture log required}"
+mkdir -p "$DIR"
+touch "$LOG"
+printf '%s\n' "$*" >>"$LOG"
+
+CFG="$DIR/openclaw.json"
+[[ -f "$DIR/policy" ]] || printf 'unsafe\n' >"$DIR/policy"
+[[ -f "$DIR/bind" ]] || : >"$DIR/bind"
+[[ -f "$DIR/token" ]] || printf 'missing\n' >"$DIR/token"
+[[ -f "$DIR/port" ]] || printf 'free\n' >"$DIR/port"
+[[ -f "$DIR/audit" ]] || printf 'clean\n' >"$DIR/audit"
+[[ -f "$DIR/service" ]] || printf 'ok\n' >"$DIR/service"
+
+read_trim() { tr -d '\r\n' <"$1"; }
+
+write_config() {
+  node -e '
+    const fs = require("fs");
+    const cfg = process.argv[1];
+    const bind = fs.readFileSync(process.argv[2], "utf8").trim();
+    const token = fs.readFileSync(process.argv[3], "utf8").trim();
+    const gw = { mode: "local" };
+    if (bind) gw.bind = bind;
+    if (token === "plaintext") {
+      gw.auth = { mode: "token", token: "PLAINTEXT_SHOULD_NOT_LEAK" };
+    } else if (token === "ref") {
+      gw.auth = {
+        mode: "token",
+        token: { source: "env", provider: "default", id: "OPENCLAW_GATEWAY_TOKEN" }
+      };
+    }
+    fs.writeFileSync(cfg, JSON.stringify({ gateway: gw }, null, 2));
+  ' "$CFG" "$DIR/bind" "$DIR/token"
+}
+
+emit_policy() {
+  local kind sec ask fb
+  kind="$(read_trim "$DIR/policy")"
+  case "$kind" in
+    cautious) sec=allowlist; ask=on-miss; fb=deny ;;
+    deny-all) sec=deny; ask=off; fb=deny ;;
+    yolo) sec=full; ask=off; fb=full ;;
+    *) sec=full; ask=off; fb=deny ;;
+  esac
+  printf '{"effectivePolicy":{"scopes":[{"security":{"effective":"%s"},"ask":{"effective":"%s"},"askFallback":{"effective":"%s"}}]}}\n' \
+    "$sec" "$ask" "$fb"
+}
+
+emit_status() {
+  local bind bind_mode host port exposed
+  bind="$(read_trim "$DIR/bind")"
+  port="$(read_trim "$DIR/port")"
+  case "$bind" in
+    ""|loopback) bind_mode=loopback; host=127.0.0.1 ;;
+    lan) bind_mode=lan; host=0.0.0.0 ;;
+    *) bind_mode="$bind"; host=0.0.0.0 ;;
+  esac
+  exposed=no
+  if [[ "$host" == "0.0.0.0" ]]; then
+    exposed=yes
+  fi
+  node -e '
+    const bindMode = process.argv[1];
+    const host = process.argv[2];
+    const portStatus = process.argv[3];
+    const exposed = process.argv[4] === "yes";
+    const service = process.argv[5];
+    const listeners = exposed ? [{ address: "0.0.0.0" }] : [];
+    const body = {
+      config: { cli: { exists: true, valid: true, path: process.argv[6] } },
+      gateway: { bindMode, bindHost: host, port: 18789 },
+      port: { status: portStatus, listeners },
+      service: {
+        inspectionReason: service === "none" ? "service-manager-unavailable" : "ok",
+        runtime: { status: portStatus === "busy" ? "running" : "stopped" }
+      }
+    };
+    process.stdout.write(JSON.stringify(body));
+  ' "$bind_mode" "$host" "$port" "$exposed" "$(read_trim "$DIR/service")" "$CFG"
+}
+
+[[ -f "$CFG" ]] || write_config
+
+if [[ "${1:-}" == "--version" ]]; then
+  printf 'OpenClaw 2026.9.6 (fixture)\n'
+  exit 0
+fi
+
+cmd="${1:-}"
+sub="${2:-}"
+
+case "$cmd" in
+  exec-policy)
+    case "$sub" in
+      show) emit_policy; exit 0 ;;
+      preset)
+        name="${3:-}"
+        if [[ "$name" == "yolo" ]]; then
+          printf 'refusing yolo in fixture\n' >&2
+          exit 99
+        fi
+        if [[ "$name" != "cautious" && "$name" != "deny-all" ]]; then
+          printf 'bad preset %s\n' "$name" >&2
+          exit 98
+        fi
+        printf '%s\n' "$name" >"$DIR/policy"
+        emit_policy
+        exit 0
+        ;;
+    esac
+    ;;
+  setup)
+    if [[ "$sub" == "--baseline" ]]; then
+      write_config
+      printf 'Setup complete: config, workspace, and session directories are ready.\n'
+      exit 0
+    fi
+    ;;
+  config)
+    case "$sub" in
+      file) printf '%s\n' "$CFG"; exit 0 ;;
+      validate) [[ -f "$CFG" ]]; exit 0 ;;
+      get)
+        if [[ "${3:-}" == "gateway.bind" ]]; then
+          b="$(read_trim "$DIR/bind")"
+          if [[ -z "$b" ]]; then
+            printf 'Config path is valid but unset: gateway.bind.\n' >&2
+            exit 1
+          fi
+          printf '%s\n' "$b"
+          exit 0
+        fi
+        ;;
+      set)
+        path="${3:-}"
+        if [[ "$path" == "gateway.bind" ]]; then
+          printf '%s\n' "${4:-}" >"$DIR/bind"
+          write_config
+          printf 'Updated gateway.bind.\n'
+          exit 0
+        fi
+        if [[ "$path" == "gateway.auth.mode" && "${4:-}" == "token" ]]; then
+          printf 'ref\n' >"$DIR/token"
+          write_config
+          printf 'Updated gateway.auth.mode.\n'
+          exit 0
+        fi
+        if [[ "$path" == "gateway.auth.token" ]]; then
+          printf 'ref\n' >"$DIR/token"
+          write_config
+          printf 'Updated gateway.auth.token.\n'
+          exit 0
+        fi
+        ;;
+    esac
+    ;;
+  gateway)
+    case "$sub" in
+      status) emit_status; exit 0 ;;
+      install)
+        if [[ "$(read_trim "$DIR/service")" == "none" ]]; then
+          printf 'No supported service manager detected. Restart the Gateway you launched manually after the update.\n' >&2
+          exit 1
+        fi
+        printf 'gateway service installed\n'
+        exit 0
+        ;;
+    esac
+    ;;
+  secrets)
+    if [[ "$sub" == "audit" ]]; then
+      printf 'Secrets audit: clean. plaintext=0, unresolved=0, shadowed=0.\n'
+      exit 0
+    fi
+    ;;
+  security)
+    if [[ "$sub" == "audit" ]]; then
+      if [[ "$(read_trim "$DIR/audit")" == "critical" ]]; then
+        printf 'Summary: 1 critical · 0 warn · 0 info\n'
+        exit 0
+      fi
+      printf 'Summary: 0 critical · 0 warn · 0 info\n'
+      exit 0
+    fi
+    ;;
+  onboard)
+    printf 'onboard fixture ok\n'
+    exit 0
+    ;;
+esac
+
+printf 'fixture does not implement: %s\n' "$*" >&2
+exit 97

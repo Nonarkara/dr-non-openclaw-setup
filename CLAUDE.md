@@ -13,3 +13,4 @@ Short version if you only read this file:
 5. Never weaken a security control to make a step succeed.
 6. Verify after every step — exit code 0 is not evidence it worked.
 7. Confirm policy with `openclaw exec-policy show`. `models scan` is not local Ollama discovery.
+8. Prefer `./bin/doctor` and `./bin/bootstrap --policy cautious|deny-all`. They fail if Node is too old, if policy is unsafe, or if the gateway is not on loopback.

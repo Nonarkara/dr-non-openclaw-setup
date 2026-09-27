@@ -1,0 +1,43 @@
+// Safe baseline shape, checked against OpenClaw 2026.9.6 with
+// `openclaw config patch --file config/openclaw.example.json5 --dry-run`.
+//
+// Bootstrap does not copy this file over a live config. It sets the same
+// gateway keys through the CLI. Use this as a map when you edit config by hand.
+// Do not put a raw API key, bot token, or gateway token in here.
+{
+  gateway: {
+    mode: "local",
+    bind: "loopback", // never lan, never 0.0.0.0
+    port: 18789,
+    tailscale: { mode: "off" },
+    auth: {
+      mode: "token",
+      token: { source: "env", provider: "default", id: "OPENCLAW_GATEWAY_TOKEN" },
+    },
+  },
+  // Upstream local onboard defaults this to "coding" when unset.
+  // coding includes files, runtime, web fetch/search, sessions, memory, cron.
+  // It does not include the browser tool until you add alsoAllow: ["browser"].
+  // Shell still stops at exec policy (cautious asks; deny-all refuses).
+  tools: {
+    profile: "coding",
+  },
+  // Remove this block if you do not run Ollama. Native API, no /v1 suffix.
+  // A manual model list skips auto-discovery, so only list models you have pulled.
+  models: {
+    providers: {
+      ollama: {
+        baseUrl: "http://127.0.0.1:11434",
+        api: "ollama",
+        timeoutSeconds: 300,
+        models: [
+          {
+            id: "qwen3:4b",
+            name: "qwen3:4b",
+            params: { thinking: false, num_ctx: 8192 },
+          },
+        ],
+      },
+    },
+  },
+}

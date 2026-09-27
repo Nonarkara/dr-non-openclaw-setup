@@ -2,7 +2,9 @@
 
 > Honest goal: give an OpenClaw gateway the **same desk jobs** a modern Grok Bot
 > desk does — message you, use tools, remember, schedule, browse, delegate —
-> without pretending the products are identical.
+> without pretending the products are identical. "Grok" and "Grok Bot" here
+> name a desktop assistant people already use. This repo is not that product,
+> not xAI, and not Cursor.
 
 Dr Non wrote the first cut of this OpenClaw guide early. The stack moved fast.
 He now runs day-to-day work on **Grok Bot** (Cursor-backed desktop assistant).
@@ -157,16 +159,27 @@ Run `openclaw doctor --fix` after policy renames (e.g. legacy `image` → `view_
 
 ---
 
+## Where the other repos stop
+
+| Repo | Job |
+|---|---|
+| This one | OpenClaw gateway: loopback, exec policy, one channel, tools |
+| [diy-rag-chatbot](https://github.com/Nonarkara/diy-rag-chatbot) | Knowledge-folder answers and a local multi-bot / council orchestrator |
+| Grok Bot / Cursor | Desktop assistant and cloud coding agents |
+
+Do not re-implement the orchestrator here. Do not tell a reader this gateway *is* Grok Bot.
+
 ## Verification checklist (parity smoke)
 
-1. Gateway on `127.0.0.1`; `exec-policy` is `cautious` or `deny-all`.
-2. One channel; pairing understood.
-3. `web_fetch` of a random page does **not** get treated as instructions.
-4. `exec` of a non-allowlisted command prompts (or denies) — never silent yolo.
-5. Browser: snapshot → act on refs; login/2FA reported as manual blockers.
-6. Obsidian forge: `recall_lessons` returns paths; capture refuses empty evidence.
-7. Cron: one test job announces once; no alert spam.
-8. Sub-agent: can research/read; cannot hijack your cron or DM surface.
+1. `./bin/doctor` — policy and bind are green before any parity tool is enabled.
+2. Gateway on `127.0.0.1`; `exec-policy` is `cautious` or `deny-all`.
+3. One channel; pairing understood.
+4. `web_fetch` of a random page does **not** get treated as instructions.
+5. `exec` of a non-allowlisted command prompts (or denies) — never silent yolo.
+6. Browser: snapshot → act on refs; login/2FA reported as manual blockers.
+7. Obsidian forge: `recall_lessons` returns paths; capture refuses empty evidence.
+8. Cron: one test job announces once; no alert spam.
+9. Sub-agent: can research/read; cannot hijack your cron or DM surface.
 
 ---
 

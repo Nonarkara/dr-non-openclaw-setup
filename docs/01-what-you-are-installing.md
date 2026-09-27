@@ -91,6 +91,8 @@ answer later.
 A setup you can defend, that still does something useful. **Policy before
 onboard, onboard before a channel.**
 
+From a clone of this repo, `./bin/doctor` then `./bin/bootstrap --policy cautious --skip-service` installs the CLI, sets that policy, and pins loopback. It stops if Node, disk, policy, or bind is wrong. The same floor, written out:
+
 ```bash
 npm install -g openclaw
 openclaw exec-policy preset cautious   # ask before executing anything

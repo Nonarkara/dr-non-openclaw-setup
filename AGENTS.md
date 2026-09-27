@@ -80,34 +80,42 @@ current OpenClaw.)*
 
 ---
 
-## Step 1 — Install
+## Steps 1–2 — Install and lock down, via the repo scripts
+
+From a clone of this repo. Do this before any channel exists.
 
 ```bash
-npm install -g openclaw
-openclaw --version
+./bin/doctor
 ```
 
-If a global install fails on permissions, **do not `sudo`.** Report it and
-suggest a Node version manager (nvm/fnm), which fixes the cause.
-
----
-
-## Step 2 — Lock down BEFORE connecting anything
-
-Order matters. Set policy before the system can receive a message from the
-outside world.
-
-```bash
-openclaw exec-policy preset cautious
-openclaw exec-policy show        # confirm what is now set — read the words
-```
-
-**Verify** the printed preset is `cautious` (or `deny-all`). An exit code of 0
-with some other preset is a finding. If it says anything else, stop and report.
+Read the lines. Exit 1 is a stop. Exit 2 is warnings (Docker missing, gateway
+not up yet). Exit 0 is all green. A zero exit from `openclaw` itself is not
+this check.
 
 🛑 **Ask the human:** *"Should the agent be able to run shell commands at all?"*
 - Wants it to run scripts / check services / build things → `cautious`
 - Just wants a conversational assistant → `deny-all` (recommend this if unsure)
+
+```bash
+./bin/bootstrap --policy cautious --skip-service
+# or: ./bin/bootstrap --policy deny-all --skip-service
+```
+
+The script installs the CLI if Node is 24.16+ and the npm prefix is writable.
+It sets the policy you named. It pins `gateway.bind=loopback`. It does not
+invent a token, does not accept `yolo`, and does not install a channel.
+
+If a global install fails on permissions, **do not `sudo`.** Report it and
+suggest a Node version manager (nvm/fnm).
+
+**Verify** with `./bin/doctor` and `openclaw exec-policy show`. You want the
+policy you asked for, and a loopback bind. Anything else is a finding.
+
+The human creates `~/.openclaw/.env` (mode 600) with `OPENCLAW_GATEWAY_TOKEN`,
+or runs `op inject -i config/env.1password.example -o ~/.openclaw/.env`.
+Then `./bin/bootstrap --policy <the same policy>` installs the service.
+If there is no launchd or systemd user manager, do not "fix" that. Report it.
+Foreground fallback, still loopback: `openclaw gateway run`.
 
 ---
 
