@@ -184,6 +184,9 @@ The general principle: **an MCP server is a privilege grant, not a plugin.**
 ## Hardening checklist
 
 Work down this list once; re-run the audits after any config change.
+`./bin/doctor` checks the same floor (Node, disk, policy, loopback, auth
+presence) and does not print secret values. It does not replace reading the
+audit output.
 
 - [ ] `openclaw exec-policy show` prints `cautious` or `deny-all`
 - [ ] `openclaw gateway status` shows a **loopback** listener (typically `127.0.0.1:18789`)

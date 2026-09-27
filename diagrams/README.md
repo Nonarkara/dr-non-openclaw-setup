@@ -171,4 +171,4 @@ flowchart TB
 
 <p align="center"><img src="first-week.png" alt="Rendered flowchart of the first-week setup order: survey and lock policy while offline, onboard and audit on loopback, optional local models, then one paired channel." width="80%"></p>
 
-Humans: the numbered first-hour in the [README](../README.md#first-hour-for-humans). Agents: [`AGENTS.md`](../AGENTS.md).
+Humans: [`docs/00-quickstart.md`](../docs/00-quickstart.md) and `./bin/doctor`. Agents: [`AGENTS.md`](../AGENTS.md).

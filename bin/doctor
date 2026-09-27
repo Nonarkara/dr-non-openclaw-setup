@@ -1,0 +1,281 @@
+#!/usr/bin/env bash
+# One command: dependencies, exec policy, loopback bind, auth presence.
+# Prints [ ok ] / [warn] / [FAIL]. Never prints secret values.
+# Exit 0 all green, 2 warnings only, 1 any failure.
+set -euo pipefail
+
+source "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/lib.sh"
+
+usage() {
+  cat <<'EOF'
+Usage: ./bin/doctor
+
+Checks this machine for a safe OpenClaw gateway baseline.
+
+  green [ ok ]   the check holds
+  yellow [warn]  usable only with the limitation named on that line
+  red [FAIL]     stop and do the next step before connecting a channel
+
+Exit 0 when every check is green, 2 when there are warnings and no failures,
+1 when anything failed. A zero exit from `openclaw` itself is not this check.
+
+Auth checks report whether a variable or file entry is present. They do not
+print the value. Upstream audits remain: `openclaw security audit` and
+`openclaw secrets audit --check`.
+EOF
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+if [[ $# -gt 0 ]]; then
+  usage >&2
+  exit 1
+fi
+
+printf 'OpenClaw setup doctor\n'
+printf 'repo: %s\n\n' "$ROOT"
+
+free_kb="$(disk_free_kb)"
+need_kb=$((10 * 1024 * 1024))
+if [[ -z "$free_kb" || ! "$free_kb" =~ ^[0-9]+$ ]]; then
+  fail "could not read free disk on /"
+else
+  free_gb=$((free_kb / 1024 / 1024))
+  if [[ "$free_kb" -lt "$need_kb" ]]; then
+    fail "disk free on / is about ${free_gb} GB (need about 10 GB)"
+    next_step "Free disk before pulling models. On a Mac, swap shares the boot volume, so a full disk looks like a model bug."
+  else
+    pass "disk about ${free_gb} GB free on /"
+  fi
+fi
+
+if ram="$(ram_gb)"; then
+  if [[ "$ram" -lt 8 ]]; then
+    warn "RAM is about ${ram} GB. The gateway can run; local models in docs/05-local-llm-16gb.md will not fit comfortably."
+  else
+    info "RAM about ${ram} GB. Model picks: docs/05-local-llm-16gb.md"
+  fi
+else
+  info "RAM unknown on this OS. Read docs/05-local-llm-16gb.md before pulling a model larger than 4B."
+fi
+
+if ver="$(node_version_raw)"; then
+  if version_ge "$ver" "24.16.0"; then
+    pass "node ${ver} (need 24.16+; upstream recommends 26)"
+  else
+    fail "node ${ver} is older than 24.16"
+    next_step "Install Node 24.16 or newer with nvm or fnm. Do not use sudo npm. Node 20 and 22 are too old for current OpenClaw."
+  fi
+else
+  fail "node is not on PATH"
+  next_step "Install Node 24.16 or newer with nvm or fnm, then re-run ./bin/doctor."
+fi
+
+if command -v npm >/dev/null 2>&1; then
+  pass "npm $(npm --version 2>/dev/null || echo present)"
+else
+  fail "npm is not on PATH"
+  next_step "npm ships with Node. Install Node 24.16+ with nvm or fnm."
+fi
+
+case "$(docker_state)" in
+  present) pass "docker or podman is on PATH (sandbox backend available)" ;;
+  missing)
+    warn "no docker or podman. Sandboxing is unavailable: a command that runs can reach the real filesystem."
+    next_step "Install Docker Desktop (Mac) or Docker/Podman (Linux) before the agent reads the web or stranger messages."
+    ;;
+  *) warn "docker check returned an unexpected state" ;;
+esac
+
+case "$(ollama_state)" in
+  up) pass "ollama is installed and http://127.0.0.1:11434 answers" ;;
+  down)
+    warn "ollama is installed but nothing is answering on 127.0.0.1:11434"
+    next_step "Start Ollama, or skip local models and use a cloud provider during onboard."
+    ;;
+  missing) info "ollama is not installed. Local models stay optional. Cloud onboard still works." ;;
+  *) warn "ollama check returned an unexpected state" ;;
+esac
+
+scan_root="${OPENCLAW_DOCTOR_SCAN_ROOT:-$ROOT}"
+scan_tree_for_secrets "$scan_root" || true
+
+if ! command -v "$OPENCLAW" >/dev/null 2>&1 && [[ ! -x "$OPENCLAW" ]]; then
+  fail "openclaw is not on PATH"
+  next_step "From this repo: ./bin/bootstrap --policy cautious --skip-service"
+  next_step "Pick deny-all instead if the agent must not run shell commands."
+  finish "doctor"
+fi
+
+oc_ver="$("$OPENCLAW" --version 2>/dev/null || true)"
+if [[ -z "$oc_ver" ]]; then
+  fail "openclaw --version produced no output"
+else
+  pass "openclaw ${oc_ver}"
+fi
+
+policy_line="$( "$OPENCLAW" exec-policy show --json 2>/dev/null | policy_fields || true )"
+IFS='|' read -r pol_kind pol_sec pol_ask pol_fb <<<"$policy_line"
+case "$pol_kind" in
+  cautious)
+    pass "exec policy is cautious or stricter (security=${pol_sec} ask=${pol_ask})"
+    ;;
+  deny-all)
+    pass "exec policy is deny-all (no shell)"
+    ;;
+  unsafe)
+    fail "exec policy is unsafe (security=${pol_sec:-unknown} ask=${pol_ask:-unknown} askFallback=${pol_fb:-unknown})"
+    next_step "Upstream default is full access with ask=off. Run ./bin/bootstrap --policy cautious (or --policy deny-all)."
+    next_step "Do not set yolo to make a command succeed."
+    ;;
+  *)
+    fail "could not read exec policy (${pol_kind:-empty})"
+    next_step "Run: openclaw exec-policy show --json"
+    ;;
+esac
+
+cfg_path="$("$OPENCLAW" config file 2>/dev/null || true)"
+if [[ -z "$cfg_path" || ! -f "$cfg_path" ]]; then
+  fail "no OpenClaw config file yet"
+  next_step "./bin/bootstrap --policy cautious --skip-service"
+else
+  auth_line="$(config_auth_fields "$cfg_path")"
+  IFS='|' read -r gw_mode gw_bind auth_mode token_kind ref_source ref_id <<<"$auth_line"
+  if [[ "$gw_mode" == "local" ]]; then
+    pass "gateway.mode is local (${cfg_path})"
+  else
+    fail "gateway.mode is '${gw_mode:-unset}', not local"
+    next_step "Run: openclaw setup --baseline"
+  fi
+  if [[ "$token_kind" == "plaintext" ]]; then
+    fail "gateway auth token is a raw string in ${cfg_path}"
+    next_step "Replace it with a SecretRef. Do not paste the token into chat or git."
+    next_step "openclaw config set gateway.auth.token --ref-provider default --ref-source env --ref-id OPENCLAW_GATEWAY_TOKEN"
+  elif [[ "$token_kind" == "unparsed" || "$auth_line" == "unparsed" ]]; then
+    fail "could not parse ${cfg_path} as JSON"
+  elif [[ "$token_kind" == "ref" ]]; then
+    if [[ "$ref_source" != "env" || -z "$ref_id" ]]; then
+      fail "gateway auth token ref is incomplete (source=${ref_source:-empty})"
+    else
+      pass "gateway auth token is an env SecretRef (${ref_id}); value not read"
+      shell_ok=0
+      file_kind="missing"
+      if shell_var_set "$ref_id"; then
+        shell_ok=1
+      fi
+      file_kind="$(env_file_value_kind "$HOME/.openclaw/.env" "$ref_id")"
+      if [[ "$file_kind" == "present" ]]; then
+        pass "~/.openclaw/.env has a non-empty ${ref_id} (value not shown)"
+      elif [[ "$shell_ok" -eq 1 ]]; then
+        warn "${ref_id} is set in this shell only. launchd/systemd will not inherit it."
+        next_step "Put the same variable in ~/.openclaw/.env with mode 600, or run the gateway in this environment: openclaw gateway run"
+      elif [[ "$file_kind" == "op-ref" ]]; then
+        warn "~/.openclaw/.env still has an op:// reference for ${ref_id}"
+        next_step "op inject -i config/env.1password.example -o ~/.openclaw/.env && chmod 600 ~/.openclaw/.env"
+      elif [[ "$file_kind" == "placeholder" ]]; then
+        fail "~/.openclaw/.env has a placeholder for ${ref_id}"
+        next_step "Replace it yourself, or op inject the template in config/env.1password.example"
+      else
+        warn "no resolvable ${ref_id} in this shell or ~/.openclaw/.env"
+        next_step "Create ~/.openclaw/.env (mode 600) or export ${ref_id} for a foreground gateway. This repo never stores the value."
+      fi
+    fi
+  else
+    warn "gateway auth token is not configured. Startup can mint a runtime token that clients will not keep."
+    next_step "Export OPENCLAW_GATEWAY_TOKEN or write ~/.openclaw/.env, then re-run ./bin/bootstrap --policy cautious"
+  fi
+
+  if [[ -f "$HOME/.openclaw/.env" ]]; then
+    mode="$(file_mode "$HOME/.openclaw/.env")"
+    tail2="${mode: -2}"
+    if [[ "$tail2" != "00" ]]; then
+      fail "~/.openclaw/.env mode is ${mode}. Group or world can read it."
+      next_step "chmod 600 ~/.openclaw/.env"
+    else
+      pass "~/.openclaw/.env mode ${mode}"
+    fi
+  fi
+fi
+
+status_json="$("$OPENCLAW" gateway status --json --no-probe 2>/dev/null || true)"
+status_line="$(printf '%s' "$status_json" | gateway_status_fields)"
+if [[ "$status_line" == "unparsed" || -z "$status_line" ]]; then
+  fail "openclaw gateway status --json --no-probe did not return JSON"
+else
+  IFS='|' read -r bind_mode bind_host gw_port port_status cfg_exists cfg_valid inspect_reason runtime_status exposed <<<"$status_line"
+  if [[ "$bind_mode" == "loopback" && ( "$bind_host" == "127.0.0.1" || "$bind_host" == "localhost" || "$bind_host" == "::1" ) && "$exposed" != "yes" ]]; then
+    pass "gateway bind is loopback (${bind_host}:${gw_port:-18789})"
+  else
+    fail "gateway bind is ${bind_mode:-unknown} host ${bind_host:-unknown} (exposed listeners: ${exposed})"
+    next_step "Bind loopback only. Do not switch to lan or 0.0.0.0 so a phone can connect. Use device pairing."
+  fi
+  if [[ "$port_status" == "busy" ]]; then
+    pass "something is listening on the gateway port (status busy)"
+  elif [[ "$port_status" == "free" ]]; then
+    warn "gateway port ${gw_port:-18789} is free. The process is not up."
+    next_step "After a token is in ~/.openclaw/.env: ./bin/bootstrap --policy cautious"
+    next_step "No service manager: openclaw gateway run   (foreground, still loopback)"
+  else
+    warn "gateway port status is '${port_status:-unknown}'"
+  fi
+  if [[ "$inspect_reason" == "service-manager-unavailable" ]]; then
+    warn "no launchd or systemd user service manager. The gateway will not survive logout on its own."
+    next_step "Mac: run bootstrap from a normal login session. Linux: a systemd --user session. Otherwise keep openclaw gateway run in the foreground."
+  elif [[ "$runtime_status" == "running" || "$port_status" == "busy" ]]; then
+    info "service runtime: ${runtime_status:-unknown}"
+  fi
+fi
+
+if [[ -n "${cfg_path:-}" && -f "${cfg_path}" ]]; then
+  if "$OPENCLAW" config validate >/dev/null 2>&1; then
+    pass "openclaw config validate"
+  else
+    fail "openclaw config validate failed"
+    next_step "Run: openclaw doctor"
+  fi
+fi
+
+sec_rc=0
+sec_out="$("$OPENCLAW" secrets audit --check 2>&1)" || sec_rc=$?
+if [[ "$sec_rc" -eq 0 ]]; then
+  pass "openclaw secrets audit --check"
+else
+  fail "openclaw secrets audit --check reported findings"
+  redact_stream "$sec_out" | sed 's/^/       /'
+fi
+
+aud_rc=0
+aud_out="$("$OPENCLAW" security audit 2>&1)" || aud_rc=$?
+summary="$(printf '%s\n' "$aud_out" | awk '/^Summary:/ {print; exit}')"
+if [[ "$aud_rc" -ne 0 ]]; then
+  fail "openclaw security audit exited ${aud_rc}"
+  redact_stream "$summary" | sed 's/^/       /'
+elif [[ "$summary" == *"0 critical"* ]]; then
+  pass "openclaw security audit (${summary})"
+  if [[ "$summary" == *"warn"* && "$summary" != *"0 warn"* ]]; then
+    info "audit warnings are expected while the Control UI stays local-only. Read them; do not add a trusted proxy to silence them."
+  fi
+else
+  fail "openclaw security audit is not clean (${summary:-no summary})"
+  next_step "Read: openclaw security audit"
+fi
+
+printf '\nProvider env presence (values are not shown):\n'
+any_provider=0
+for key in ANTHROPIC_API_KEY OPENAI_API_KEY OPENROUTER_API_KEY XAI_API_KEY GEMINI_API_KEY GROQ_API_KEY OLLAMA_API_KEY; do
+  if shell_var_set "$key"; then
+    info "${key} is set in this shell"
+    any_provider=1
+  else
+    info "${key} unset"
+  fi
+done
+if [[ "$any_provider" -eq 0 && "$(ollama_state)" != "up" ]]; then
+  warn "no cloud provider key in this shell, and Ollama is not up. The gateway has nothing to call until you onboard."
+  next_step "You type the key: openclaw onboard --classic   (loopback, skip extra channels)"
+  next_step "Or install Ollama, pull qwen3:4b, then ./bin/bootstrap --policy cautious --onboard-local"
+fi
+
+finish "doctor"

@@ -1,0 +1,316 @@
+#!/usr/bin/env bash
+# Idempotent safe baseline for a local OpenClaw gateway.
+# Never writes a secret. Never sets exec policy yolo. Never binds beyond loopback.
+set -euo pipefail
+
+source "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/lib.sh"
+
+POLICY=""
+SKIP_SERVICE=0
+UPGRADE=0
+ONBOARD_LOCAL=0
+OLLAMA_MODEL="qwen3:4b"
+FORCE_POLICY=0
+
+usage() {
+  cat <<'EOF'
+Usage: ./bin/bootstrap --policy cautious|deny-all [options]
+
+Writes a safe local baseline if Node and disk allow it:
+  exec policy (the flag you pass; never yolo)
+  gateway.mode=local and gateway.bind=loopback
+  gateway token SecretRef when a token is already available to you
+
+Options:
+  --policy cautious|deny-all   Required. cautious asks before shell; deny-all never runs shell.
+  --skip-service               Do not install the launchd/systemd service.
+  --upgrade                    Reinstall the openclaw npm package.
+  --onboard-local              Non-interactive Ollama onboard. Requires Ollama up and the model pulled.
+  --ollama-model <id>          Model id for --onboard-local (default qwen3:4b).
+  --force-policy               Allow cautious to replace an existing deny-all policy.
+
+The script refuses to invent a gateway token. Put OPENCLAW_GATEWAY_TOKEN in
+~/.openclaw/.env (mode 600), or export it yourself. A 1Password template is
+config/env.1password.example. It also refuses to install the service until that
+file can resolve the token — a shell export is not visible to launchd or systemd.
+
+Exit 1 if the baseline is not safe. Re-running is safe: a matching policy and
+an existing loopback bind are left alone.
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help) usage; exit 0 ;;
+    --policy)
+      [[ $# -ge 2 ]] || die "--policy needs cautious or deny-all"
+      POLICY="$2"
+      shift 2
+      ;;
+    --skip-service) SKIP_SERVICE=1; shift ;;
+    --upgrade) UPGRADE=1; shift ;;
+    --onboard-local) ONBOARD_LOCAL=1; shift ;;
+    --ollama-model)
+      [[ $# -ge 2 ]] || die "--ollama-model needs a model id"
+      OLLAMA_MODEL="$2"
+      shift 2
+      ;;
+    --force-policy) FORCE_POLICY=1; shift ;;
+    *)
+      usage >&2
+      die "unknown argument: $1"
+      ;;
+  esac
+done
+
+if [[ "$POLICY" != "cautious" && "$POLICY" != "deny-all" ]]; then
+  usage >&2
+  if [[ "$POLICY" == "yolo" ]]; then
+    die "refusing --policy yolo. cautious is the floor."
+  fi
+  die "pass --policy cautious or --policy deny-all. This script will not guess."
+fi
+
+printf 'OpenClaw bootstrap\n'
+printf 'policy requested: %s\n' "$POLICY"
+printf 'repo: %s\n\n' "$ROOT"
+
+free_kb="$(disk_free_kb)"
+need_kb=$((10 * 1024 * 1024))
+if [[ -z "$free_kb" || ! "$free_kb" =~ ^[0-9]+$ || "$free_kb" -lt "$need_kb" ]]; then
+  die "free disk on / is under about 10 GB (or unreadable). Free space, then re-run. Low disk makes local model failures look like model bugs."
+fi
+pass "disk has at least 10 GB free"
+
+if ! ver="$(node_version_raw)"; then
+  die "node is not on PATH. Install Node 24.16+ with nvm or fnm. Do not use sudo npm."
+fi
+if ! version_ge "$ver" "24.16.0"; then
+  die "node ${ver} is older than 24.16. Install Node 24.16+ (26 recommended) with nvm or fnm, then re-run. Node 20 and 22 cannot run current OpenClaw."
+fi
+pass "node ${ver}"
+
+if ! command -v npm >/dev/null 2>&1; then
+  die "npm is not on PATH."
+fi
+
+need_install=0
+if [[ "$UPGRADE" -eq 1 ]]; then
+  need_install=1
+elif ! "$OPENCLAW" --version >/dev/null 2>&1; then
+  need_install=1
+fi
+
+if [[ "$need_install" -eq 1 ]]; then
+  prefix="$(npm prefix -g 2>/dev/null || true)"
+  if [[ -n "$prefix" && ! -w "$prefix" ]]; then
+    die "npm global prefix ${prefix} is not writable. Do not sudo. Use nvm or fnm so your user owns the prefix."
+  fi
+  printf 'Installing openclaw with npm (global, no sudo)...\n'
+  if ! npm install -g openclaw; then
+    die "npm install -g openclaw failed. If the error is EACCES, switch to nvm or fnm. Do not re-run with sudo."
+  fi
+  hash -r || true
+  if ! "$OPENCLAW" --version >/dev/null 2>&1; then
+    die "openclaw is still not runnable. npm prefix is ${prefix:-unknown}. Add its bin directory to PATH."
+  fi
+fi
+pass "openclaw $("$OPENCLAW" --version 2>/dev/null)"
+
+policy_line="$( "$OPENCLAW" exec-policy show --json | policy_fields )"
+IFS='|' read -r pol_kind pol_sec pol_ask pol_fb <<<"$policy_line"
+apply=0
+case "$pol_kind" in
+  cautious)
+    if [[ "$POLICY" == "cautious" ]]; then
+      pass "exec policy already cautious"
+    else
+      apply=1
+    fi
+    ;;
+  deny-all)
+    if [[ "$POLICY" == "deny-all" ]]; then
+      pass "exec policy already deny-all"
+    elif [[ "$FORCE_POLICY" -eq 1 ]]; then
+      apply=1
+    else
+      die "exec policy is already deny-all. Refusing to loosen it to cautious. Pass --force-policy only if you mean that."
+    fi
+    ;;
+  unsafe)
+    printf 'Exec policy is unsafe (security=%s ask=%s). Setting %s.\n' "${pol_sec:-unknown}" "${pol_ask:-unknown}" "$POLICY"
+    apply=1
+    ;;
+  *)
+    die "could not read exec policy (${pol_kind:-empty} security=${pol_sec:-} ask=${pol_ask:-}). Not changing it."
+    ;;
+esac
+
+if [[ "$apply" -eq 1 ]]; then
+  "$OPENCLAW" exec-policy preset "$POLICY" --json >/dev/null
+  policy_line="$( "$OPENCLAW" exec-policy show --json | policy_fields )"
+  IFS='|' read -r pol_kind pol_sec pol_ask pol_fb <<<"$policy_line"
+  if [[ "$POLICY" == "deny-all" && "$pol_kind" != "deny-all" ]]; then
+    die "exec-policy preset deny-all did not stick (now ${pol_kind:-unknown})."
+  fi
+  if [[ "$POLICY" == "cautious" && "$pol_kind" != "cautious" ]]; then
+    die "exec-policy preset cautious did not stick (now ${pol_kind:-unknown} security=${pol_sec:-} ask=${pol_ask:-})."
+  fi
+  pass "exec policy set to ${POLICY}"
+fi
+
+printf 'Ensuring baseline config (gateway.mode=local, no channels)...\n'
+if ! "$OPENCLAW" setup --baseline; then
+  die "openclaw setup --baseline failed. Config was not half-applied by this script beyond what that command itself wrote. Run: openclaw doctor"
+fi
+pass "openclaw setup --baseline"
+
+cfg_path="$("$OPENCLAW" config file 2>/dev/null || true)"
+if [[ -z "$cfg_path" || ! -f "$cfg_path" ]]; then
+  die "setup --baseline finished but openclaw config file is missing."
+fi
+auth_line="$(config_auth_fields "$cfg_path")"
+IFS='|' read -r gw_mode gw_bind auth_mode token_kind ref_source ref_id <<<"$auth_line"
+if [[ "$gw_mode" != "local" ]]; then
+  die "gateway.mode is '${gw_mode:-unset}' after baseline. Refusing to continue."
+fi
+pass "gateway.mode=local"
+
+bind_rc=0
+bind_out="$("$OPENCLAW" config get gateway.bind 2>&1)" || bind_rc=$?
+bind_out="$(printf '%s' "$bind_out" | tr -d '\r' | awk 'NF {print; exit}')"
+if [[ "$bind_rc" -ne 0 && "$bind_out" == *"unset"* ]]; then
+  "$OPENCLAW" config set gateway.bind loopback
+  pass "set gateway.bind=loopback"
+elif [[ "$bind_out" == "loopback" ]]; then
+  pass "gateway.bind already loopback"
+elif [[ "$bind_out" == "lan" || "$bind_out" == "custom" || "$bind_out" == "auto" || "$bind_out" == "tailnet" || "$bind_out" == *"0.0.0.0"* ]]; then
+  die "gateway.bind is '${bind_out}'. Refusing to leave it, and refusing to rewrite it in silence. Set it back to loopback yourself if that wider bind was a mistake."
+else
+  die "could not read gateway.bind (exit ${bind_rc}): $(redact_stream "$bind_out")"
+fi
+
+auth_line="$(config_auth_fields "$cfg_path")"
+IFS='|' read -r gw_mode gw_bind auth_mode token_kind ref_source ref_id <<<"$auth_line"
+
+token_file_kind="$(env_file_value_kind "$HOME/.openclaw/.env" OPENCLAW_GATEWAY_TOKEN)"
+shell_token=0
+if shell_var_set OPENCLAW_GATEWAY_TOKEN; then
+  shell_token=1
+fi
+
+if [[ "$token_kind" == "plaintext" ]]; then
+  die "gateway.auth.token in ${cfg_path} is a raw string. Refusing to overwrite it. Move it to a SecretRef yourself, then re-run."
+fi
+
+if [[ "$token_kind" == "ref" ]]; then
+  if [[ "$ref_id" != "OPENCLAW_GATEWAY_TOKEN" || "$ref_source" != "env" ]]; then
+    pass "gateway token already uses a SecretRef (${ref_source:-unknown}/${ref_id:-unknown}); left unchanged"
+  else
+    pass "gateway token SecretRef already points at OPENCLAW_GATEWAY_TOKEN"
+  fi
+elif [[ "$auth_mode" == "password" ]]; then
+  die "gateway.auth.mode is password. This bootstrap will not switch it to token."
+elif [[ "$shell_token" -eq 1 || "$token_file_kind" == "present" ]]; then
+  if [[ -z "$auth_mode" ]]; then
+    "$OPENCLAW" config set gateway.auth.mode token
+  elif [[ "$auth_mode" != "token" ]]; then
+    die "gateway.auth.mode is '${auth_mode}'. Refusing to change it."
+  fi
+  "$OPENCLAW" config set gateway.auth.token --ref-provider default --ref-source env --ref-id OPENCLAW_GATEWAY_TOKEN
+  auth_line="$(config_auth_fields "$cfg_path")"
+  IFS='|' read -r gw_mode gw_bind auth_mode token_kind ref_source ref_id <<<"$auth_line"
+  if [[ "$token_kind" != "ref" || "$ref_id" != "OPENCLAW_GATEWAY_TOKEN" ]]; then
+    die "failed to store an env SecretRef for OPENCLAW_GATEWAY_TOKEN."
+  fi
+  if [[ "$shell_token" -eq 1 && ${#OPENCLAW_GATEWAY_TOKEN} -ge 12 ]] && grep -q -F -- "$OPENCLAW_GATEWAY_TOKEN" "$cfg_path"; then
+    die "refusing to continue: the gateway token value was written into ${cfg_path}."
+  fi
+  pass "gateway token stored as an env SecretRef (value not written here)"
+else
+  warn "no OPENCLAW_GATEWAY_TOKEN in this shell or ~/.openclaw/.env. No token was invented."
+  next_step "Create ~/.openclaw/.env mode 600 yourself, or: op inject -i config/env.1password.example -o ~/.openclaw/.env && chmod 600 ~/.openclaw/.env"
+fi
+
+if [[ -f "$HOME/.openclaw/.env" ]]; then
+  mode="$(file_mode "$HOME/.openclaw/.env")"
+  if [[ "${mode: -2}" != "00" ]]; then
+    die "~/.openclaw/.env mode is ${mode}. chmod 600 before installing a service."
+  fi
+  pass "~/.openclaw/.env mode ${mode}"
+fi
+
+if [[ "$ONBOARD_LOCAL" -eq 1 ]]; then
+  tags=""
+  if [[ -n "${OPENCLAW_BOOTSTRAP_OLLAMA_TAGS:-}" ]]; then
+    tags="$(cat "$OPENCLAW_BOOTSTRAP_OLLAMA_TAGS")"
+  elif ! tags="$(curl -fsS --max-time 5 http://127.0.0.1:11434/api/tags 2>/dev/null)"; then
+    die "Ollama is not answering on 127.0.0.1:11434. Start it and ollama pull ${OLLAMA_MODEL}, or drop --onboard-local and run openclaw onboard yourself."
+  fi
+  if ! printf '%s' "$tags" | node -e '
+    let raw=""; process.stdin.on("data", d => raw += d); process.stdin.on("end", () => {
+      const want = process.argv[1];
+      let data; try { data = JSON.parse(raw); } catch (e) { process.exit(2); }
+      const names = (data.models || []).map(m => m.name || m.model || "");
+      if (!names.includes(want)) process.exit(1);
+    });
+  ' "$OLLAMA_MODEL"; then
+    die "Ollama does not have ${OLLAMA_MODEL}. Run: ollama pull ${OLLAMA_MODEL}"
+  fi
+  printf 'Local onboard for %s. Upstream requires --accept-risk for non-interactive setup.\n' "$OLLAMA_MODEL"
+  printf 'Channels, skills, and search stay skipped. Bind stays loopback. Policy stays %s.\n' "$POLICY"
+  if ! "$OPENCLAW" onboard --non-interactive --accept-risk --skip-health \
+    --skip-channels --skip-skills --skip-search --skip-hooks --skip-ui --skip-daemon \
+    --gateway-bind loopback \
+    --auth-choice ollama \
+    --custom-base-url "http://127.0.0.1:11434" \
+    --custom-model-id "$OLLAMA_MODEL"; then
+    die "local onboard failed. Policy was not loosened. Fix Ollama or run openclaw onboard and type the choice yourself."
+  fi
+  policy_line="$( "$OPENCLAW" exec-policy show --json | policy_fields )"
+  IFS='|' read -r pol_kind pol_sec pol_ask pol_fb <<<"$policy_line"
+  if [[ "$pol_kind" == "unsafe" ]]; then
+    printf 'Onboard left exec policy unsafe. Restoring %s.\n' "$POLICY"
+    "$OPENCLAW" exec-policy preset "$POLICY" --json >/dev/null
+  fi
+  pass "local Ollama route recorded for ${OLLAMA_MODEL}"
+fi
+
+token_file_kind="$(env_file_value_kind "$HOME/.openclaw/.env" OPENCLAW_GATEWAY_TOKEN)"
+if [[ "$SKIP_SERVICE" -eq 1 ]]; then
+  info "service install skipped (--skip-service)"
+  next_step "When ~/.openclaw/.env holds the token: ./bin/bootstrap --policy ${POLICY}"
+  next_step "Or foreground only: openclaw gateway run"
+elif [[ "$token_file_kind" != "present" ]]; then
+  fail "service not installed. ~/.openclaw/.env does not yet resolve OPENCLAW_GATEWAY_TOKEN."
+  next_step "A shell export is not enough for launchd/systemd. Write ~/.openclaw/.env (mode 600), then re-run ./bin/bootstrap --policy ${POLICY}"
+  next_step "Foreground instead: ./bin/bootstrap --policy ${POLICY} --skip-service && openclaw gateway run"
+  printf '\nBaseline config and exec policy are in place. The service was not installed.\n'
+  exit 1
+else
+  install_rc=0
+  install_out="$("$OPENCLAW" gateway install --runtime node 2>&1)" || install_rc=$?
+  if [[ "$install_rc" -ne 0 ]]; then
+    if printf '%s\n' "$install_out" | grep -q "No supported service manager"; then
+      fail "no launchd or systemd user service manager"
+      next_step "Mac: run this from a graphical login session. Linux: log in with systemd --user."
+      next_step "Until then, from this same environment: openclaw gateway run"
+    else
+      fail "openclaw gateway install failed"
+      redact_stream "$install_out" | sed 's/^/       /'
+    fi
+    printf '\nBaseline config and exec policy are in place. The service was not installed.\n'
+    exit 1
+  fi
+  pass "gateway service install returned success"
+  next_step "Prove it: ./bin/doctor && openclaw gateway status"
+fi
+
+printf '\n'
+printf 'Needs you (this script will not do these):\n'
+printf '  - Type provider keys in `openclaw onboard --classic`, or pass --onboard-local when Ollama is up.\n'
+printf '  - Connect at most one channel, then `openclaw pairing list <channel>`.\n'
+printf '  - Read docs/03-security.md before the first inbound DM.\n'
+printf '\n'
+printf 'Checked shape (not applied over a live config): config/openclaw.example.json5\n'
+exit 0
